@@ -114,7 +114,7 @@ class _SavedScreenState extends State<SavedScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.bookmark_outline,
+                              const Icon(Icons.bookmark_outline,
                                   size: 64, color: AppColors.highlight),
                               const SizedBox(height: 16),
                               Text(

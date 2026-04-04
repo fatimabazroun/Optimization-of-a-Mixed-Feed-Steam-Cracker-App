@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../workspace/presentation/screens/main_shell.dart';
 
@@ -16,6 +17,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
 
+  String _firstName = '';
+
   @override
   void initState() {
     super.initState();
@@ -28,6 +31,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
     _controller.forward();
+    _loadName();
+  }
+
+  Future<void> _loadName() async {
+    final attrs = await AuthService.fetchUserAttributes();
+    final fullName = attrs['name'] ?? '';
+    final firstName = fullName.trim().split(' ').first;
+    if (mounted) setState(() => _firstName = firstName);
   }
 
   @override
@@ -71,9 +82,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
                   const SizedBox(height: 40),
-                  const Text('Hi Engineer,',
-                      style: AppTextStyles.heading1,
-                      textAlign: TextAlign.center),
+                  Text(
+                    _firstName.isNotEmpty ? 'Hi, $_firstName!' : 'Hi there!',
+                    style: AppTextStyles.heading1,
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 8),
                   const Text('Welcome to CrackerIQ',
                       style: TextStyle(

@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import 'welcome_screen.dart';
 
 class VerificationScreen extends StatefulWidget {
   final String email;
-  const VerificationScreen({super.key, required this.email});
+  final bool isSignUp;
+
+  const VerificationScreen({
+    super.key,
+    required this.email,
+    this.isSignUp = true,
+  });
 
   @override
   State<VerificationScreen> createState() => _VerificationScreenState();
@@ -13,14 +21,14 @@ class VerificationScreen extends StatefulWidget {
 
 class _VerificationScreenState extends State<VerificationScreen> {
   final List<TextEditingController> _controllers =
-      List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+      List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _hasError = false;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    // Listen to focus changes to rebuild border colors
     for (final f in _focusNodes) {
       f.addListener(() => setState(() {}));
     }
@@ -28,14 +36,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    for (final c in _controllers) { c.dispose(); }
+    for (final f in _focusNodes) { f.dispose(); }
     super.dispose();
   }
 
   void _onChanged(String value, int index) {
     setState(() => _hasError = false);
-    if (value.isNotEmpty && index < 3) {
+    if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
     if (value.isEmpty && index > 0) {
@@ -45,7 +53,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   bool get _isComplete => _controllers.every((c) => c.text.isNotEmpty);
 
-  void _onContinue() {
+  String get _code => _controllers.map((c) => c.text).join();
+
+  Future<void> _onContinue() async {
     if (!_isComplete) {
       setState(() => _hasError = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -54,7 +64,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             children: [
               Icon(Icons.warning_amber_outlined, color: Colors.white, size: 18),
               SizedBox(width: 8),
-              Text('Please enter the complete 4-digit code'),
+              Text('Please enter the complete 6-digit code'),
             ],
           ),
           backgroundColor: Colors.red.shade400,
@@ -64,16 +74,67 @@ class _VerificationScreenState extends State<VerificationScreen> {
       );
       return;
     }
-    Navigator.pushAndRemoveUntil(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const WelcomeScreen(),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
-      (route) => false,
-    );
+
+    setState(() => _loading = true);
+    try {
+      if (widget.isSignUp) {
+        await AuthService.confirmSignUp(
+          email: widget.email,
+          code: _code,
+        );
+      }
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const WelcomeScreen(),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+        (route) => false,
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.friendlyError(e)),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _onResend() async {
+    try {
+      await AuthService.resendSignUpCode(widget.email);
+      for (final c in _controllers) { c.clear(); }
+      setState(() => _hasError = false);
+      _focusNodes[0].requestFocus();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Code resent successfully'),
+          backgroundColor: AppColors.cyan,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.friendlyError(e)),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override
@@ -103,7 +164,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 Center(
                   child: Column(
                     children: [
-                      // Icon
                       Container(
                         width: 72, height: 72,
                         decoration: BoxDecoration(
@@ -120,7 +180,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           style: AppTextStyles.heading2),
                       const SizedBox(height: 12),
                       Text(
-                        "We've sent a 4-digit code to\n${widget.email}",
+                        "We've sent a 6-digit code to\n${widget.email}",
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 13,
@@ -131,20 +191,20 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
                       const SizedBox(height: 40),
 
-                      // OTP inputs
+                      // 6-digit OTP inputs
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(4, (i) {
+                        children: List.generate(6, (i) {
                           final isFocused = _focusNodes[i].hasFocus;
                           final hasValue = _controllers[i].text.isNotEmpty;
                           final showError = _hasError && !hasValue;
 
                           return Container(
-                            width: 60, height: 60,
-                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            width: 46, height: 56,
+                            margin: const EdgeInsets.symmetric(horizontal: 5),
                             decoration: BoxDecoration(
                               color: AppColors.inputBg,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: showError
                                     ? Colors.red
@@ -163,7 +223,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               keyboardType: TextInputType.number,
                               maxLength: 1,
                               style: const TextStyle(
-                                fontSize: 22,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.darkBase,
                               ),
@@ -177,30 +237,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         }),
                       ),
 
-                      // Error message
                       if (_hasError) ...[
                         const SizedBox(height: 12),
-                        const Text('Please fill in all 4 digits',
+                        const Text('Please fill in all 6 digits',
                             style: TextStyle(fontSize: 12, color: Colors.red)),
                       ],
 
                       const SizedBox(height: 32),
 
-                      // Resend
                       GestureDetector(
-                        onTap: () {
-                          for (final c in _controllers) c.clear();
-                          setState(() => _hasError = false);
-                          _focusNodes[0].requestFocus();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Code resent successfully'),
-                              backgroundColor: AppColors.cyan,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        },
+                        onTap: _onResend,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
@@ -212,7 +258,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       ),
 
                       const SizedBox(height: 24),
-                      GradientButton(text: 'Continue', onPressed: _onContinue),
+                      GradientButton(
+                        text: _loading ? 'Verifying…' : 'Continue',
+                        onPressed: _loading ? null : _onContinue,
+                      ),
                     ],
                   ),
                 ),

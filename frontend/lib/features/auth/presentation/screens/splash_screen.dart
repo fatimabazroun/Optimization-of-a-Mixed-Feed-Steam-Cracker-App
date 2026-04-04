@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
+import '../../../workspace/presentation/screens/main_shell.dart';
 import 'register_screen.dart';
 import 'login_screen.dart';
 
@@ -28,7 +30,6 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // Logo animation
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -40,7 +41,6 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _logoController, curve: const Interval(0.0, 0.5)),
     );
 
-    // Text animation
     _textController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -53,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _textController, curve: Curves.easeIn),
     );
 
-    // Button animation
     _buttonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -66,7 +65,6 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _buttonController, curve: Curves.easeIn),
     );
 
-    // Staggered start
     _logoController.forward();
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) _textController.forward();
@@ -74,6 +72,26 @@ class _SplashScreenState extends State<SplashScreen>
     Future.delayed(const Duration(milliseconds: 700), () {
       if (mounted) _buttonController.forward();
     });
+
+    // Check if user is already signed in after animation starts
+    _checkAuthSession();
+  }
+
+  Future<void> _checkAuthSession() async {
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    final signedIn = await AuthService.isSignedIn();
+    if (signedIn && mounted) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const MainShell(),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
+      );
+    }
   }
 
   @override
@@ -109,7 +127,6 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 const Spacer(flex: 2),
 
-                // Animated Logo
                 AnimatedBuilder(
                   animation: _logoController,
                   builder: (_, child) => FadeTransition(
@@ -129,20 +146,19 @@ class _SplashScreenState extends State<SplashScreen>
 
                 const SizedBox(height: 36),
 
-                // Animated Text
                 FadeTransition(
                   opacity: _textFade,
                   child: SlideTransition(
                     position: _textSlide,
-                    child: Column(
+                    child: const Column(
                       children: [
-                        const Text(
+                        Text(
                           'Welcome\nto CrackerIQ',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.heading1,
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
+                        SizedBox(height: 12),
+                        Text(
                           'Your journey begins here',
                           style: AppTextStyles.body,
                           textAlign: TextAlign.center,
@@ -154,7 +170,6 @@ class _SplashScreenState extends State<SplashScreen>
 
                 const Spacer(flex: 2),
 
-                // Animated Buttons
                 FadeTransition(
                   opacity: _buttonFade,
                   child: SlideTransition(

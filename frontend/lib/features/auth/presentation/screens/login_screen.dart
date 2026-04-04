@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../workspace/presentation/screens/main_shell.dart';
 import 'register_screen.dart';
 import 'verification_screen.dart';
 
@@ -17,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _submitted = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -25,19 +29,56 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _onLogin() {
+  Future<void> _onLogin() async {
     setState(() => _submitted = true);
-    if (_formKey.currentState?.validate() ?? false) {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _loading = true);
+    try {
+      await AuthService.signIn(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const MainShell(),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 350),
+        ),
+        (route) => false,
+      );
+    } on UserNotConfirmedException {
+      // User registered but never verified email — send them to verify
+      final email = _emailController.text.trim();
+      await AuthService.resendSignUpCode(email);
+      if (!mounted) return;
       Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) =>
-              VerificationScreen(email: _emailController.text),
+          pageBuilder: (_, __, ___) => VerificationScreen(
+            email: email,
+            isSignUp: true,
+          ),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 300),
         ),
       );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.friendlyError(e)),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -74,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('Log in to continue your journey', style: AppTextStyles.body),
                   const SizedBox(height: 36),
 
-                  // Email
                   AppTextField(
                     hint: 'Email address',
                     controller: _emailController,
@@ -89,14 +129,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Password
                   AppTextField(
                     hint: 'Password',
                     isPassword: true,
                     controller: _passwordController,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Password is required';
-                      if (v.length < 6) return 'Password must be at least 6 characters';
+                      if (v.length < 8) return 'Password must be at least 8 characters';
                       return null;
                     },
                   ),
@@ -111,17 +150,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   const SizedBox(height: 32),
-                  GradientButton(text: 'Log In', onPressed: _onLogin),
+                  GradientButton(
+                    text: _loading ? 'Signing in…' : 'Log In',
+                    onPressed: _loading ? null : _onLogin,
+                  ),
                   const SizedBox(height: 24),
 
-                  Row(
+                  const Row(
                     children: [
-                      const Expanded(child: Divider(color: AppColors.inputBorder)),
+                      Expanded(child: Divider(color: AppColors.inputBorder)),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: EdgeInsets.symmetric(horizontal: 12),
                         child: Text('or', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
                       ),
-                      const Expanded(child: Divider(color: AppColors.inputBorder)),
+                      Expanded(child: Divider(color: AppColors.inputBorder)),
                     ],
                   ),
 

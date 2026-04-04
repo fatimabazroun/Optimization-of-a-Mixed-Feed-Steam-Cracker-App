@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../features/auth/presentation/screens/splash_screen.dart';
 import 'about_screen.dart';
 
@@ -12,14 +14,89 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   bool _isEditing = false;
-  final _nameController = TextEditingController(text: 'Engineer User');
-  final _emailController = TextEditingController(text: 'engineer@crackeriq.com');
+  bool _loading = true;
+  bool _saving = false;
+
+  String _name = '';
+  String _email = '';
+
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _loadUser();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUser() async {
+    try {
+      final attrs = await AuthService.fetchUserAttributes();
+      if (!mounted) return;
+      setState(() {
+        _name = attrs['name'] ?? '';
+        _email = attrs['email'] ?? '';
+        _nameController.text = _name;
+        _emailController.text = _email;
+        _loading = false;
+      });
+    } on AuthException {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    final newName = _nameController.text.trim();
+    if (newName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Name cannot be empty'),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await AuthService.updateName(newName);
+      if (!mounted) return;
+      setState(() {
+        _name = newName;
+        _isEditing = false;
+        _saving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Profile updated successfully'),
+          backgroundColor: AppColors.cyan,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.friendlyError(e)),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override
@@ -46,15 +123,28 @@ class _AccountScreenState extends State<AccountScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
-                      BoxShadow(color: AppColors.primaryBlue.withOpacity(0.07), blurRadius: 16, offset: const Offset(0, 4)),
+                      BoxShadow(
+                        color: AppColors.primaryBlue.withOpacity(0.07),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
                   ),
-                  child: _isEditing ? _editingView() : _profileView(),
+                  child: _loading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2),
+                          ),
+                        )
+                      : _isEditing
+                          ? _editingView()
+                          : _profileView(),
                 ),
 
                 const SizedBox(height: 14),
 
-                // About — taps to separate page
+                // About
                 GestureDetector(
                   onTap: () => Navigator.push(
                     context,
@@ -71,7 +161,11 @@ class _AccountScreenState extends State<AccountScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
-                        BoxShadow(color: AppColors.primaryBlue.withOpacity(0.07), blurRadius: 16, offset: const Offset(0, 4)),
+                        BoxShadow(
+                          color: AppColors.primaryBlue.withOpacity(0.07),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
                       ],
                     ),
                     child: Row(
@@ -123,7 +217,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
 
                 const SizedBox(height: 24),
-                Center(
+                const Center(
                   child: Text('Mixed Feed Cracker v2.1.4',
                       style: TextStyle(fontSize: 12, color: AppColors.textLight)),
                 ),
@@ -137,32 +231,50 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _profileView() {
+    // Generate initials avatar from name
+    final initials = _name.trim().isNotEmpty
+        ? _name.trim().split(' ').map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').take(2).join()
+        : '?';
+
     return Row(
       children: [
         Container(
           width: 56, height: 56,
           decoration: BoxDecoration(
-            color: AppColors.cyan.withOpacity(0.12),
+            gradient: AppColors.tealGradient,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(Icons.person_rounded, color: AppColors.cyan, size: 28),
+          child: Center(
+            child: Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_nameController.text,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+              Text(
+                _name.isNotEmpty ? _name : 'No name set',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.darkBase),
+              ),
               const SizedBox(height: 4),
               Row(
                 children: [
                   const Icon(Icons.email_outlined, size: 12, color: AppColors.textLight),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: Text(_emailController.text,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textLight),
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      _email,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textLight),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -185,7 +297,10 @@ class _AccountScreenState extends State<AccountScreen> {
           children: [
             Container(
               width: 48, height: 48,
-              decoration: BoxDecoration(color: AppColors.cyan.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(
+                color: AppColors.cyan.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: const Icon(Icons.person_rounded, color: AppColors.cyan, size: 24),
             ),
             const SizedBox(width: 12),
@@ -193,21 +308,34 @@ class _AccountScreenState extends State<AccountScreen> {
           ],
         ),
         const SizedBox(height: 16),
+
         const Text('Full Name', style: TextStyle(fontSize: 12, color: AppColors.textLight)),
         const SizedBox(height: 6),
-        _editField(_nameController, 'Full Name'),
+        _editField(_nameController, 'Full Name', readOnly: false),
+
         const SizedBox(height: 14),
         const Text('Email Address', style: TextStyle(fontSize: 12, color: AppColors.textLight)),
         const SizedBox(height: 6),
-        _editField(_emailController, 'Email Address'),
+        _editField(_emailController, 'Email Address', readOnly: true),
+        const SizedBox(height: 4),
+        const Text(
+          'Email cannot be changed here',
+          style: TextStyle(fontSize: 11, color: AppColors.textLight),
+        ),
+
         const SizedBox(height: 18),
         Row(
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => setState(() => _isEditing = false),
-                icon: const Icon(Icons.save_outlined, size: 16, color: Colors.white),
-                label: const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                onPressed: _saving ? null : _saveChanges,
+                icon: _saving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.save_outlined, size: 16, color: Colors.white),
+                label: Text(
+                  _saving ? 'Saving…' : 'Save Changes',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.cyan,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -219,7 +347,10 @@ class _AccountScreenState extends State<AccountScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton(
-                onPressed: () => setState(() => _isEditing = false),
+                onPressed: _saving ? null : () {
+                  _nameController.text = _name;
+                  setState(() => _isEditing = false);
+                },
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   side: const BorderSide(color: AppColors.inputBorder),
@@ -234,18 +365,31 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  Widget _editField(TextEditingController controller, String hint) {
+  Widget _editField(TextEditingController controller, String hint, {required bool readOnly}) {
     return TextField(
       controller: controller,
-      style: const TextStyle(fontSize: 14, color: AppColors.darkBase),
+      readOnly: readOnly,
+      style: TextStyle(
+        fontSize: 14,
+        color: readOnly ? AppColors.textLight : AppColors.darkBase,
+      ),
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: AppColors.inputBg,
+        fillColor: readOnly ? AppColors.inputBg.withOpacity(0.5) : AppColors.inputBg,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.inputBorder)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.cyan, width: 1.5)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.inputBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: readOnly ? AppColors.inputBorder : AppColors.cyan, width: 1.5),
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        suffixIcon: readOnly
+            ? const Icon(Icons.lock_outline, size: 16, color: AppColors.textLight)
+            : null,
       ),
     );
   }
@@ -263,15 +407,21 @@ class _AccountScreenState extends State<AccountScreen> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.textLight)),
           ),
           TextButton(
-            onPressed: () => Navigator.pushAndRemoveUntil(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (_, __, ___) => const SplashScreen(),
-                transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-                transitionDuration: const Duration(milliseconds: 400),
-              ),
-              (route) => false,
-            ),
+            onPressed: () async {
+              final nav = Navigator.of(context);
+              nav.pop();
+              await AuthService.signOut();
+              if (!mounted) return;
+              nav.pushAndRemoveUntil(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const SplashScreen(),
+                  transitionsBuilder: (_, anim, __, child) =>
+                      FadeTransition(opacity: anim, child: child),
+                  transitionDuration: const Duration(milliseconds: 400),
+                ),
+                (route) => false,
+              );
+            },
             child: const Text('Log Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
           ),
         ],

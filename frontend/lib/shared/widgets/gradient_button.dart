@@ -3,7 +3,7 @@ import '../../core/theme/app_theme.dart';
 
 class GradientButton extends StatefulWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final LinearGradient? gradient;
   final double? width;
 
@@ -42,10 +42,10 @@ class _GradientButtonState extends State<GradientButton>
     super.dispose();
   }
 
-  void _onTapDown(_) => _controller.forward();
+  void _onTapDown(_) { if (widget.onPressed != null) _controller.forward(); }
   void _onTapUp(_) {
     _controller.reverse();
-    widget.onPressed();
+    widget.onPressed?.call();
   }
   void _onTapCancel() => _controller.reverse();
 
@@ -57,9 +57,9 @@ class _GradientButtonState extends State<GradientButton>
       onTapCancel: _onTapCancel,
       child: AnimatedBuilder(
         animation: _scaleAnimation,
-        builder: (context, child) => Transform.scale(
-          scale: _scaleAnimation.value,
-          child: child,
+        builder: (context, child) => Opacity(
+          opacity: widget.onPressed == null ? 0.55 : 1.0,
+          child: Transform.scale(scale: _scaleAnimation.value, child: child),
         ),
         child: SizedBox(
           width: widget.width ?? double.infinity,

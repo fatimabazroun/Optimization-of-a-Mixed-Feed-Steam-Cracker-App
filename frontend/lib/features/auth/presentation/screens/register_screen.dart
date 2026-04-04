@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:amplify_flutter/amplify_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import 'login_screen.dart';
@@ -19,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _submitted = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -29,19 +32,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _onGetStarted() {
+  Future<void> _onGetStarted() async {
     setState(() => _submitted = true);
-    if (_formKey.currentState?.validate() ?? false) {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _loading = true);
+    try {
+      await AuthService.signUp(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
       Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) =>
-              VerificationScreen(email: _emailController.text),
+          pageBuilder: (_, __, ___) => VerificationScreen(
+            email: _emailController.text.trim(),
+            isSignUp: true,
+          ),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 300),
         ),
       );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.friendlyError(e)),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -78,7 +104,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Begin your journey to CrackerIQ', style: AppTextStyles.body),
                   const SizedBox(height: 32),
 
-                  // Full name
                   AppTextField(
                     hint: 'Full Name',
                     controller: _nameController,
@@ -90,7 +115,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Email
                   AppTextField(
                     hint: 'Email address',
                     controller: _emailController,
@@ -105,21 +129,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Password
                   AppTextField(
                     hint: 'Password',
                     isPassword: true,
                     controller: _passwordController,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Password is required';
-                      if (v.length < 6) return 'At least 6 characters required';
+                      if (v.length < 8) return 'At least 8 characters required';
                       if (!RegExp(r'[0-9]').hasMatch(v)) return 'Include at least one number';
+                      if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(v)) {
+                        return 'Include at least one special character';
+                      }
                       return null;
                     },
                   ),
                   const SizedBox(height: 14),
 
-                  // Confirm password
                   AppTextField(
                     hint: 'Confirm Password',
                     isPassword: true,
@@ -132,7 +157,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
 
                   const SizedBox(height: 32),
-                  GradientButton(text: 'Get Started', onPressed: _onGetStarted),
+                  GradientButton(
+                    text: _loading ? 'Creating account…' : 'Get Started',
+                    onPressed: _loading ? null : _onGetStarted,
+                  ),
                   const SizedBox(height: 20),
 
                   const Text(

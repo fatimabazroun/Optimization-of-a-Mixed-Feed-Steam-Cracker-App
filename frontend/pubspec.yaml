@@ -12,6 +12,8 @@ dependencies:
   flutter_riverpod: ^2.5.1
   google_fonts: ^6.2.1
   equatable: ^2.0.5
+  amplify_flutter: ^2.3.0
+  amplify_auth_cognito: ^2.3.0
 
 dev_dependencies:
   flutter_test:

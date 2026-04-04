@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/gradient_button.dart';
 import 'configure_simulation_screen.dart';
 
 class SimulationDetailScreen extends StatefulWidget {
@@ -95,11 +94,11 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     child: GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
-                          const SizedBox(width: 4),
-                          const Text('Back to Workspace', style: AppTextStyles.body),
+                          Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                          SizedBox(width: 4),
+                          Text('Back to Workspace', style: AppTextStyles.body),
                         ],
                       ),
                     ),

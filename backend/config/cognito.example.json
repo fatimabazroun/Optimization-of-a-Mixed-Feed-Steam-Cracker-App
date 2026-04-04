@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this file to cognito.json and fill in your real values. cognito.json is gitignored.",
+  "region": "YOUR_AWS_REGION",
+  "userPoolId": "YOUR_USER_POOL_ID",
+  "appClientId": "YOUR_APP_CLIENT_ID",
+  "authFlowType": "USER_SRP_AUTH"
+}
