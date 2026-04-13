@@ -16,9 +16,19 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
   late AnimationController _fadeController;
   late Animation<double> _fade;
 
+  // Non-Ethane state only
   String? _selectedTemp;
   final _pressureController = TextEditingController();
   String _validPhase = 'Vapor-Only';
+
+  // Rxn 1 dropdown (Ethane only)
+  double _selectedRxn1 = 0.70;
+
+  static const List<double> _rxn1Values = [
+    0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50, 0.45, 0.40,
+  ];
+
+  bool get _isEthaneCracking => widget.scenario['feedType'] == 'Ethane';
 
   final List<Map<String, dynamic>> _reactions = [
     {'rxn': 1, 'component': 'ETHAN-01', 'stoichiometry': 'ETHAN-01 → HYDRO-01 + ETHYL-01', 'value': 0.70},
@@ -31,9 +41,6 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     {'rxn': 8, 'component': 'ETHAN-01', 'stoichiometry': 'ETHAN-01 + ETHYL-01 → METHA-01 + PROPY-01', 'value': 0.02},
   ];
 
-  double get _totalConversion =>
-      _reactions.fold(0.0, (sum, r) => sum + (r['value'] as double));
-  bool get _conversionsValid => (_totalConversion - 1.0).abs() < 0.001;
 
   @override
   void initState() {
@@ -102,49 +109,51 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                               const Text('Temperature (°C)',
                                   style: TextStyle(fontSize: 12, color: AppColors.textLight)),
                               const SizedBox(height: 10),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                children: ['850', '900', '1000'].map((t) {
-                                  final selected = _selectedTemp == t;
-                                  return GestureDetector(
-                                    onTap: () => setState(() => _selectedTemp = t),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      margin: const EdgeInsets.only(right: 10),
-                                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
-                                      decoration: BoxDecoration(
-                                        gradient: selected
-                                            ? LinearGradient(
-                                                colors: [accentColor, AppColors.primaryBlue],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              )
-                                            : null,
-                                        color: selected ? null : AppColors.inputBg,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: selected ? Colors.transparent : AppColors.inputBorder,
-                                        ),
-                                        boxShadow: selected
-                                            ? [BoxShadow(
-                                                color: accentColor.withOpacity(0.35),
-                                                blurRadius: 12,
-                                                offset: const Offset(0, 4),
-                                              )]
-                                            : [],
+                              _isEthaneCracking
+                                  ? _lockedField('850°C', accentColor)
+                                  : SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        children: ['850', '900', '1000'].map((t) {
+                                          final selected = _selectedTemp == t;
+                                          return GestureDetector(
+                                            onTap: () => setState(() => _selectedTemp = t),
+                                            child: AnimatedContainer(
+                                              duration: const Duration(milliseconds: 200),
+                                              margin: const EdgeInsets.only(right: 10),
+                                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
+                                              decoration: BoxDecoration(
+                                                gradient: selected
+                                                    ? LinearGradient(
+                                                        colors: [accentColor, AppColors.primaryBlue],
+                                                        begin: Alignment.topLeft,
+                                                        end: Alignment.bottomRight,
+                                                      )
+                                                    : null,
+                                                color: selected ? null : AppColors.inputBg,
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: selected ? Colors.transparent : AppColors.inputBorder,
+                                                ),
+                                                boxShadow: selected
+                                                    ? [BoxShadow(
+                                                        color: accentColor.withOpacity(0.35),
+                                                        blurRadius: 12,
+                                                        offset: const Offset(0, 4),
+                                                      )]
+                                                    : [],
+                                              ),
+                                              child: Text('$t°C',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: selected ? Colors.white : AppColors.textMedium,
+                                                  )),
+                                            ),
+                                          );
+                                        }).toList(),
                                       ),
-                                      child: Text('$t°C',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: selected ? Colors.white : AppColors.textMedium,
-                                          )),
                                     ),
-                                  );
-                                }).toList(),
-                              ),
-                              ),
 
                               const SizedBox(height: 20),
 
@@ -152,70 +161,72 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                               const Text('Pressure (bar)',
                                   style: TextStyle(fontSize: 12, color: AppColors.textLight)),
                               const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _pressureController,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.darkBase,
-                                      ),
-                                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                                      validator: (val) {
-                                        if (val == null || val.isEmpty) return 'Pressure is required';
-                                        final p = double.tryParse(val);
-                                        if (p == null) return 'Enter a valid number';
-                                        if (p < 0.5 || p > 10) return 'Range: 0.5 – 10 bar';
-                                        return null;
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: '0.5 – 10 bar',
-                                        filled: true,
-                                        fillColor: AppColors.inputBg,
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: BorderSide.none,
+                              _isEthaneCracking
+                                  ? _lockedField('1.5 bar', accentColor)
+                                  : Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextFormField(
+                                            controller: _pressureController,
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.darkBase,
+                                            ),
+                                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                                            validator: (val) {
+                                              if (val == null || val.isEmpty) return 'Pressure is required';
+                                              final p = double.tryParse(val);
+                                              if (p == null) return 'Enter a valid number';
+                                              if (p < 0.5 || p > 10) return 'Range: 0.5 – 10 bar';
+                                              return null;
+                                            },
+                                            decoration: InputDecoration(
+                                              hintText: '0.5 – 10 bar',
+                                              filled: true,
+                                              fillColor: AppColors.inputBg,
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: BorderSide.none,
+                                              ),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: const BorderSide(color: AppColors.inputBorder, width: 1),
+                                              ),
+                                              focusedBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: BorderSide(color: accentColor, width: 1.5),
+                                              ),
+                                              errorBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                                              ),
+                                              focusedErrorBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                                              ),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                            ),
+                                          ),
                                         ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: AppColors.inputBorder, width: 1),
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.inputBg,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: AppColors.inputBorder),
+                                          ),
+                                          child: const Text('bar',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.textMedium,
+                                                fontWeight: FontWeight.w600,
+                                              )),
                                         ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: BorderSide(color: accentColor, width: 1.5),
-                                        ),
-                                        errorBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-                                        ),
-                                        focusedErrorBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-                                        ),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                      ),
+                                      ],
                                     ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.inputBg,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.inputBorder),
-                                    ),
-                                    child: const Text('bar',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.textMedium,
-                                          fontWeight: FontWeight.w600,
-                                        )),
-                                  ),
-                                ],
-                              ),
 
                               const SizedBox(height: 20),
 
@@ -254,33 +265,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                         const SizedBox(height: 28),
 
                         // ── Reactions ──
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _sectionTitle('Reactions'),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _conversionsValid
-                                    ? AppColors.cyan.withOpacity(0.12)
-                                    : Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                'Total: ${_totalConversion.toStringAsFixed(2)} ${_conversionsValid ? "✓" : "✗"}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _conversionsValid ? AppColors.cyan : Colors.red,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        const Text('Fractional conversions must total 1.00',
-                            style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                        _sectionTitle('Reactions'),
                         const SizedBox(height: 14),
 
                         _sectionCard(
@@ -292,70 +277,64 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: Column(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 28, height: 28,
-                                          decoration: BoxDecoration(
-                                            color: accentColor.withOpacity(0.12),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Center(
-                                            child: Text('${r['rxn']}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: accentColor,
-                                                )),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(r['component'],
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: AppColors.darkBase,
-                                                  )),
-                                              Text(r['stoichiometry'],
-                                                  style: const TextStyle(
-                                                    fontSize: 10,
-                                                    color: AppColors.textLight,
-                                                  )),
-                                            ],
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 70,
-                                          child: TextFormField(
-                                            initialValue: r['value'].toStringAsFixed(2),
-                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: accentColor,
+                                    // Rxn 1 in Ethane mode → image dropdown
+                                    if (i == 0 && _isEthaneCracking)
+                                      _rxn1DropdownRow(r, accentColor)
+                                    else
+                                      Row(
+                                        children: [
+                                          _rxnBadge(r['rxn'] as int, accentColor),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(r['component'] as String,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: AppColors.darkBase,
+                                                    )),
+                                                Text(r['stoichiometry'] as String,
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: AppColors.textLight,
+                                                    )),
+                                              ],
                                             ),
-                                            decoration: InputDecoration(
-                                              filled: true,
-                                              fillColor: accentColor.withOpacity(0.08),
-                                              border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(10),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                                            ),
-                                            onChanged: (val) {
-                                              final parsed = double.tryParse(val);
-                                              if (parsed != null) setState(() => _reactions[i]['value'] = parsed);
-                                            },
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                          _isEthaneCracking
+                                              ? _readOnlyFraction(r['value'] as double, accentColor)
+                                              : SizedBox(
+                                                  width: 70,
+                                                  child: TextFormField(
+                                                    initialValue: (r['value'] as double).toStringAsFixed(2),
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: accentColor,
+                                                    ),
+                                                    decoration: InputDecoration(
+                                                      filled: true,
+                                                      fillColor: accentColor.withOpacity(0.08),
+                                                      border: OutlineInputBorder(
+                                                        borderRadius: BorderRadius.circular(10),
+                                                        borderSide: BorderSide.none,
+                                                      ),
+                                                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                                    ),
+                                                    onChanged: (val) {
+                                                      final parsed = double.tryParse(val);
+                                                      if (parsed != null) {
+                                                        setState(() => _reactions[i]['value'] = parsed);
+                                                      }
+                                                    },
+                                                  ),
+                                                ),
+                                        ],
+                                      ),
                                     if (i < _reactions.length - 1)
                                       const Padding(
                                         padding: EdgeInsets.only(top: 12),
@@ -375,58 +354,49 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                           icon: Icons.play_circle_outline_rounded,
                           accentColor: accentColor,
                           onPressed: () {
-                            if (_selectedTemp == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Please select a temperature.'),
-                                  backgroundColor: Colors.red.shade400,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              );
-                              return;
-                            }
-                            if (_pressureController.text.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Please enter a pressure value.'),
-                                  backgroundColor: Colors.red.shade400,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              );
-                              return;
-                            }
-                            final p = double.tryParse(_pressureController.text);
-                            if (p == null || p < 0.5 || p > 10) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Pressure must be between 0.5 – 10 bar.'),
-                                  backgroundColor: Colors.red.shade400,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              );
-                              return;
-                            }
-                            if (!_conversionsValid) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Fractional conversions must total 1.00.'),
-                                  backgroundColor: Colors.red.shade400,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              );
-                              return;
+                            if (!_isEthaneCracking) {
+                              if (_selectedTemp == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Please select a temperature.'),
+                                    backgroundColor: Colors.red.shade400,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                return;
+                              }
+                              if (_pressureController.text.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Please enter a pressure value.'),
+                                    backgroundColor: Colors.red.shade400,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                return;
+                              }
+                              final p = double.tryParse(_pressureController.text);
+                              if (p == null || p < 0.5 || p > 10) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Pressure must be between 0.5 – 10 bar.'),
+                                    backgroundColor: Colors.red.shade400,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                return;
+                              }
                             }
                             Navigator.push(
                               context,
                               PageRouteBuilder(
                                 pageBuilder: (_, __, ___) => SimulationResultsScreen(
                                   scenario: widget.scenario,
-                                  temperature: _selectedTemp!,
-                                  pressure: _pressureController.text,
+                                  temperature: _isEthaneCracking ? '850' : _selectedTemp!,
+                                  pressure: _isEthaneCracking ? '1.5' : _pressureController.text,
                                 ),
                                 transitionsBuilder: (_, anim, __, child) =>
                                     FadeTransition(opacity: anim, child: child),
@@ -446,6 +416,154 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
           ),
         ),
       ),
+    );
+  }
+
+  // ── Locked display (temperature / pressure) ──────────────────────────────
+  Widget _lockedField(String value, Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.inputBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline, size: 16, color: AppColors.textLight),
+          const SizedBox(width: 10),
+          Text(value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: accentColor,
+              )),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('Fixed',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: accentColor,
+                )),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Read-only fraction chip ───────────────────────────────────────────────
+  Widget _readOnlyFraction(double value, Color accentColor) {
+    return Container(
+      width: 70,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: accentColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Center(
+        child: Text(
+          value.toStringAsFixed(2),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: accentColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Rxn number badge ──────────────────────────────────────────────────────
+  Widget _rxnBadge(int rxn, Color accentColor) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: accentColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Center(
+        child: Text('$rxn',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: accentColor,
+            )),
+      ),
+    );
+  }
+
+  // ── Rxn 1 numeric dropdown row (Ethane only) ─────────────────────────────
+  Widget _rxn1DropdownRow(Map<String, dynamic> r, Color accentColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _rxnBadge(1, accentColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r['component'] as String,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkBase,
+                      )),
+                  Text(r['stoichiometry'] as String,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textLight,
+                      )),
+                ],
+              ),
+            ),
+            // Numeric dropdown for Rxn 1 fraction
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accentColor.withOpacity(0.25)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<double>(
+                  value: _selectedRxn1,
+                  isDense: true,
+                  icon: Icon(Icons.keyboard_arrow_down, color: accentColor, size: 16),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: accentColor,
+                  ),
+                  items: _rxn1Values.map((v) {
+                    return DropdownMenuItem<double>(
+                      value: v,
+                      child: Text(v.toStringAsFixed(2)),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedRxn1 = val;
+                        _reactions[0]['value'] = val;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -475,7 +593,6 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
       child: child,
     );
   }
-
 }
 
 class _GlowButton extends StatefulWidget {

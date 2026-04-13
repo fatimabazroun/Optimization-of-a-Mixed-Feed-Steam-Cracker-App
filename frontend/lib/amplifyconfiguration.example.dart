@@ -1,4 +1,3 @@
-// Copy this file to amplifyconfiguration.dart and fill in your real values.
 // amplifyconfiguration.dart is gitignored — never commit it.
 const amplifyconfig = '''{
     "UserAgent": "aws-amplify-cli/2.0",

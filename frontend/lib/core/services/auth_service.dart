@@ -59,8 +59,8 @@ class AuthService {
     return session.isSignedIn;
   }
 
-  /// Fetches the current user's name and email from Cognito.
-  /// Returns a map with keys 'name' and 'email'.
+  /// Fetches the current user's name, email and sub (unique ID) from Cognito.
+  /// Returns a map with keys 'name', 'email', 'sub'.
   static Future<Map<String, String>> fetchUserAttributes() async {
     final attributes = await Amplify.Auth.fetchUserAttributes();
     final map = <String, String>{};
@@ -69,6 +69,8 @@ class AuthService {
         map['name'] = attr.value;
       } else if (attr.userAttributeKey == AuthUserAttributeKey.email) {
         map['email'] = attr.value;
+      } else if (attr.userAttributeKey == CognitoUserAttributeKey.sub) {
+        map['sub'] = attr.value;
       }
     }
     return map;

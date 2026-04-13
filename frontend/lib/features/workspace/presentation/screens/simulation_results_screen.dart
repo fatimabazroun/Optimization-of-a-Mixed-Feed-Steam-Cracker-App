@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../saved/presentation/screens/saved_screen.dart';
 import 'main_shell.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/scenario_service.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/report_service.dart';
 
 class SimulationResultsScreen extends StatefulWidget {
   final Map<String, dynamic> scenario;
@@ -270,7 +272,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                           children: [
                             Expanded(child: _GlowActionButton(icon: Icons.bookmark_outline, label: 'Save', accentColor: accentColor, onTap: () => _showSaveDialog(context, accentColor))),
                             const SizedBox(width: 12),
-                            Expanded(child: _GlowActionButton(icon: Icons.download_outlined, label: 'Report', accentColor: accentColor, onTap: () {})),
+                            Expanded(child: _GlowActionButton(icon: Icons.download_outlined, label: 'Report', accentColor: accentColor, onTap: () => _generateReport(context))),
                             const SizedBox(width: 12),
                             Expanded(child: _GlowActionButton(icon: Icons.refresh_rounded, label: 'Recalculate', accentColor: accentColor, onTap: () => Navigator.pop(context))),
                           ],
@@ -486,6 +488,59 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
 
 
+  Future<void> _generateReport(BuildContext context) async {
+    // Show loading snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            SizedBox(
+              width: 16, height: 16,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Generating PDF report…'),
+          ],
+        ),
+        backgroundColor: AppColors.cyan,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+
+    try {
+      final attrs = await AuthService.fetchUserAttributes();
+      await ReportService.generateAndShare(
+        scenarioTitle: widget.scenario['title'] as String,
+        feedType: widget.scenario['feedType'] as String? ?? '',
+        temperature: widget.temperature,
+        pressure: widget.pressure,
+        overallStatus: _results['overallStatus'] as String,
+        tempStatus: _results['tempStatus'] as String,
+        tempMessage: _results['tempMessage'] as String,
+        pressureStatus: _results['pressureStatus'] as String,
+        pressureMessage: _results['pressureMessage'] as String,
+        ethyleneYield: _results['ethyleneYield'] as double,
+        co2Emissions: _results['co2Emissions'] as double,
+        fuelDuty: _results['fuelDuty'] as double,
+        h2Recovery: _results['h2Recovery'] as double,
+        userName: attrs['name'] ?? '',
+        userEmail: attrs['email'] ?? '',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to generate report. Please try again.'),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
   void _showSaveDialog(BuildContext context, Color accentColor) {
     final nameController = TextEditingController(
       text: '${widget.scenario['title']} – ${DateTime.now().day} ${_monthName(DateTime.now().month)} ${DateTime.now().year}',
@@ -545,13 +600,13 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
   }
 
-  void _saveScenario(BuildContext context, String name) {
+  Future<void> _saveScenario(BuildContext context, String name) async {
     try {
-      final simId = 'SIM-${DateTime.now().year}-${SavedScenariosStore.scenarios.length + 1}';
       final now = DateTime.now();
+      final simId = 'SIM-${now.year}-${now.millisecondsSinceEpoch % 10000}';
       final date = '${_monthName(now.month)} ${now.day}, ${now.year} at ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-      SavedScenariosStore.scenarios.insert(0, {
+      await ScenarioService.addScenario({
         'name': name,
         'date': date,
         'simId': simId,
@@ -562,6 +617,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         'scenario': widget.scenario['title'],
       });
 
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(

@@ -49,6 +49,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => VerificationScreen(
             email: _emailController.text.trim(),
+            password: _passwordController.text,
             isSignUp: true,
           ),
           transitionsBuilder: (_, anim, __, child) =>

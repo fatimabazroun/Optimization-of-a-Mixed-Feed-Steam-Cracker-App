@@ -7,11 +7,13 @@ import 'welcome_screen.dart';
 
 class VerificationScreen extends StatefulWidget {
   final String email;
+  final String? password;
   final bool isSignUp;
 
   const VerificationScreen({
     super.key,
     required this.email,
+    this.password,
     this.isSignUp = true,
   });
 
@@ -82,6 +84,13 @@ class _VerificationScreenState extends State<VerificationScreen> {
           email: widget.email,
           code: _code,
         );
+        // Auto sign-in after confirmation so the session exists immediately
+        if (widget.password != null) {
+          await AuthService.signIn(
+            email: widget.email,
+            password: widget.password!,
+          );
+        }
       }
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -139,11 +148,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Responsive box width: fills available horizontal space minus padding and gaps
+    final boxSize = ((screenWidth - 56 - 48) / 6).clamp(38.0, 52.0);
+
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,7 +173,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 48),
 
                 Center(
                   child: Column(
@@ -191,7 +205,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
                       const SizedBox(height: 40),
 
-                      // 6-digit OTP inputs
+                      // 6-digit OTP inputs – responsive width
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(6, (i) {
@@ -200,8 +214,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           final showError = _hasError && !hasValue;
 
                           return Container(
-                            width: 46, height: 56,
-                            margin: const EdgeInsets.symmetric(horizontal: 5),
+                            width: boxSize,
+                            height: boxSize * 1.2,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
                               color: AppColors.inputBg,
                               borderRadius: BorderRadius.circular(12),
@@ -222,8 +237,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               textAlign: TextAlign.center,
                               keyboardType: TextInputType.number,
                               maxLength: 1,
-                              style: const TextStyle(
-                                fontSize: 20,
+                              style: TextStyle(
+                                fontSize: boxSize * 0.42,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.darkBase,
                               ),
@@ -243,7 +258,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             style: TextStyle(fontSize: 12, color: Colors.red)),
                       ],
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 40),
 
                       GestureDetector(
                         onTap: _onResend,
@@ -257,16 +272,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       GradientButton(
                         text: _loading ? 'Verifying…' : 'Continue',
                         onPressed: _loading ? null : _onContinue,
                       ),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
-
-                const Spacer(),
               ],
             ),
           ),

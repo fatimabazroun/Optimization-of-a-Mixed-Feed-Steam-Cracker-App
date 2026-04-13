@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
-
-// Simple in-memory store for saved scenarios
-class SavedScenariosStore {
-  static final List<Map<String, dynamic>> scenarios = [];
-}
+import '../../../../core/services/scenario_service.dart';
+import '../../../workspace/presentation/screens/simulation_results_screen.dart';
 
 class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
@@ -16,15 +13,31 @@ class SavedScreen extends StatefulWidget {
 class _SavedScreenState extends State<SavedScreen> {
   String _filter = 'All';
   final List<String> _filters = ['All', 'Optimal', 'Warning', 'Critical'];
+  List<Map<String, dynamic>> _scenarios = [];
+  bool _loading = true;
 
-  List<Map<String, dynamic>> get _filtered {
-    if (_filter == 'All') return SavedScenariosStore.scenarios;
-    return SavedScenariosStore.scenarios
-        .where((s) => s['status'] == _filter)
-        .toList();
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
 
-  void _confirmDelete(int index) {
+  Future<void> _load() async {
+    final list = await ScenarioService.loadScenarios();
+    if (mounted) {
+      setState(() {
+        _scenarios = list;
+        _loading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_filter == 'All') return _scenarios;
+    return _scenarios.where((s) => s['status'] == _filter).toList();
+  }
+
+  void _confirmDelete(int realIndex) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -32,7 +45,7 @@ class _SavedScreenState extends State<SavedScreen> {
         title: const Text('Delete Scenario',
             style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.darkBase)),
         content: Text(
-          'Are you sure you want to delete "${SavedScenariosStore.scenarios[index]['name']}"?',
+          'Are you sure you want to delete "${_scenarios[realIndex]['name']}"?',
           style: const TextStyle(color: AppColors.textMedium),
         ),
         actions: [
@@ -41,11 +54,13 @@ class _SavedScreenState extends State<SavedScreen> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.textLight)),
           ),
           TextButton(
-            onPressed: () {
-              setState(() => SavedScenariosStore.scenarios.removeAt(index));
+            onPressed: () async {
               Navigator.pop(context);
+              await ScenarioService.deleteScenario(realIndex);
+              await _load();
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+            child: const Text('Delete',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -109,43 +124,105 @@ class _SavedScreenState extends State<SavedScreen> {
 
                 // List
                 Expanded(
-                  child: _filtered.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.bookmark_outline,
-                                  size: 64, color: AppColors.highlight),
-                              const SizedBox(height: 16),
-                              Text(
-                                _filter == 'All'
-                                    ? 'No saved scenarios yet'
-                                    : 'No $_filter scenarios',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textMedium,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text('Run a simulation to save results here',
-                                  style: AppTextStyles.body),
-                            ],
-                          ),
+                  child: _loading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.cyan, strokeWidth: 2),
                         )
-                      : ListView.builder(
-                          itemCount: _filtered.length,
-                          itemBuilder: (context, i) {
-                            final s = _filtered[i];
-                            final realIndex = SavedScenariosStore.scenarios.indexOf(s);
-                            return _scenarioCard(s, realIndex);
-                          },
-                        ),
+                      : _filtered.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.bookmark_outline,
+                                      size: 64, color: AppColors.highlight),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _filter == 'All'
+                                        ? 'No saved scenarios yet'
+                                        : 'No $_filter scenarios',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textMedium,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                      'Run a simulation to save results here',
+                                      style: AppTextStyles.body),
+                                ],
+                              ),
+                            )
+                          : RefreshIndicator(
+                              color: AppColors.cyan,
+                              onRefresh: _load,
+                              child: ListView.builder(
+                                itemCount: _filtered.length,
+                                itemBuilder: (context, i) {
+                                  final s = _filtered[i];
+                                  final realIndex = _scenarios.indexOf(s);
+                                  return _scenarioCard(s, realIndex);
+                                },
+                              ),
+                            ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Maps saved scenario title back to the full scenario data needed by SimulationResultsScreen
+  static const _scenarioMeta = {
+    'Ethane Cracking': {
+      'title': 'Ethane Cracking',
+      'feedType': 'Ethane',
+      'color': AppColors.cyan,
+      'tempRange': '800°C – 860°C',
+      'pressure': '1.7 – 2.0 bar',
+    },
+    'Naphtha Cracking': {
+      'title': 'Naphtha Cracking',
+      'feedType': 'Naphtha',
+      'color': AppColors.purple,
+      'tempRange': '820°C – 880°C',
+      'pressure': '1.5 – 1.8 bar',
+    },
+    'Mixed Feed Cracking': {
+      'title': 'Mixed Feed Cracking',
+      'feedType': 'Mixed (Ethane + Naphtha)',
+      'color': AppColors.midTone,
+      'tempRange': '810°C – 870°C',
+      'pressure': '1.6 – 1.9 bar',
+    },
+  };
+
+  void _openSavedScenario(Map<String, dynamic> s) {
+    final scenarioTitle = s['scenario'] as String;
+    final scenarioData = Map<String, dynamic>.from(
+      _scenarioMeta[scenarioTitle] ?? {
+        'title': scenarioTitle,
+        'feedType': 'Unknown',
+        'color': AppColors.cyan,
+        'tempRange': 'N/A',
+        'pressure': 'N/A',
+      },
+    );
+
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => SimulationResultsScreen(
+          scenario: scenarioData,
+          temperature: s['temperature'] as String,
+          pressure: s['pressure'] as String,
+        ),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
   }
@@ -168,7 +245,9 @@ class _SavedScreenState extends State<SavedScreen> {
         statusIcon = Icons.trending_down_rounded;
     }
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _openSavedScenario(s),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -299,6 +378,7 @@ class _SavedScreenState extends State<SavedScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }
