@@ -18,31 +18,34 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   final List<Map<String, dynamic>> _scenarios = [
     {
-      'title': 'Ethane Cracking',
-      'description': 'High ethylene yield with pure ethane feed. Optimized for maximum olefin production.',
+      'scenarioNumber': 'Scenario 1',
+      'title': 'Base Reaction',
+      'tagline': 'Evaluate main ethane cracking performance.',
+      'description':
+          'Based on modifying the fractional conversion of the main feed component (ETHAN-01) in the reactor.',
+      'reactionBasis': 'Primary cracking reaction of ethane only.',
       'icon': Icons.bubble_chart_outlined,
       'color': AppColors.cyan,
-      'feedType': 'Ethane',
-      'tempRange': '800°C – 860°C',
-      'pressure': '1.7 – 2.0 bar',
     },
     {
-      'title': 'Naphtha Cracking',
-      'description': 'Mixed product slate with naphtha feed. Balanced ethylene and propylene output.',
-      'icon': Icons.thermostat_outlined,
+      'scenarioNumber': 'Scenario 2',
+      'title': 'Multi-Reaction',
+      'tagline': 'Analyze effect of side reactions and byproducts.',
+      'description':
+          'Based on modifying the fractional conversion of multiple reactions involving the main feed (ETHAN-01) instead of only the primary reaction.',
+      'reactionBasis': 'Primary and secondary cracking reactions.',
+      'icon': Icons.account_tree_outlined,
       'color': AppColors.purple,
-      'feedType': 'Naphtha',
-      'tempRange': '820°C – 880°C',
-      'pressure': '1.5 – 1.8 bar',
     },
     {
-      'title': 'Mixed Feed Cracking',
-      'description': 'Flexible feed combining ethane and naphtha for optimal trade-offs.',
-      'icon': Icons.merge_type_outlined,
+      'scenarioNumber': 'Scenario 3',
+      'title': 'Full Network',
+      'tagline': 'Simulate complete reaction network with intermediates.',
+      'description':
+          'Involves modifying the fractional conversion of all key reactions in the system, including primary, secondary, and reactions involving propylene (PROPY-01) and other intermediates.',
+      'reactionBasis': 'Complete reaction network.',
+      'icon': Icons.hub_outlined,
       'color': AppColors.midTone,
-      'feedType': 'Mixed (Ethane + Naphtha)',
-      'tempRange': '810°C – 870°C',
-      'pressure': '1.6 – 1.9 bar',
     },
   ];
 
@@ -106,7 +109,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                 const SizedBox(height: 28),
                 const Text('Workspace', style: AppTextStyles.heading1),
                 const SizedBox(height: 6),
-                const Text('Select a simulation model to begin', style: AppTextStyles.body),
+                const Text('Select a scenario to begin your simulation', style: AppTextStyles.body),
                 const SizedBox(height: 28),
                 Expanded(
                   child: ListView.builder(
@@ -117,8 +120,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                         child: SlideTransition(
                           position: _slideAnimations[i],
                           child: SimulationCard(
+                            scenarioNumber: _scenarios[i]['scenarioNumber'],
                             title: _scenarios[i]['title'],
-                            description: _scenarios[i]['description'],
+                            tagline: _scenarios[i]['tagline'],
+                            reactionBasis: _scenarios[i]['reactionBasis'],
                             icon: _scenarios[i]['icon'],
                             iconColor: _scenarios[i]['color'],
                             onTap: () => _openScenario(_scenarios[i]),

@@ -1,33 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
-import 'welcome_screen.dart';
+import 'forgot_password_new_screen.dart';
 
-class VerificationScreen extends StatefulWidget {
+class ForgotPasswordCodeScreen extends StatefulWidget {
   final String email;
-  final String? password;
-  final bool isSignUp;
 
-  const VerificationScreen({
-    super.key,
-    required this.email,
-    this.password,
-    this.isSignUp = true,
-  });
+  const ForgotPasswordCodeScreen({super.key, required this.email});
 
   @override
-  State<VerificationScreen> createState() => _VerificationScreenState();
+  State<ForgotPasswordCodeScreen> createState() => _ForgotPasswordCodeScreenState();
 }
 
-class _VerificationScreenState extends State<VerificationScreen> {
+class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
   final List<TextEditingController> _controllers =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+
   bool _hasError = false;
   bool _loading = false;
+  String? _errorMessage;
+  bool _resendSent = false;
 
   @override
   void initState() {
@@ -45,7 +41,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   void _onChanged(String value, int index) {
-    setState(() => _hasError = false);
+    setState(() {
+      _hasError = false;
+      _errorMessage = null;
+    });
     if (value.isNotEmpty && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
@@ -56,102 +55,56 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   bool get _isComplete => _controllers.every((c) => c.text.isNotEmpty);
-
   String get _code => _controllers.map((c) => c.text).join();
 
-  Future<void> _onContinue() async {
+  void _onContinue() {
     if (!_isComplete) {
-      setState(() => _hasError = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_amber_outlined, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Please enter the complete 6-digit code'),
-            ],
-          ),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'Please fill in all 6 digits';
+      });
       return;
     }
-
-    setState(() => _loading = true);
-    try {
-      if (widget.isSignUp) {
-        await AuthService.confirmSignUp(
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => ForgotPasswordNewScreen(
           email: widget.email,
           code: _code,
-        );
-        // Auto sign-in after confirmation so the session exists immediately
-        if (widget.password != null) {
-          await AuthService.signIn(
-            email: widget.email,
-            password: widget.password!,
-          );
-        }
-      }
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const WelcomeScreen(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 300),
         ),
-        (route) => false,
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService.friendlyError(e)),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
   }
 
   Future<void> _onResend() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+      _resendSent = false;
+    });
     try {
-      await AuthService.resendSignUpCode(widget.email);
-      for (final c in _controllers) { c.clear(); }
-      setState(() => _hasError = false);
-      _focusNodes[0].requestFocus();
+      await AuthService.resetPassword(widget.email);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Code resent successfully'),
-          backgroundColor: AppColors.cyan,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      for (final c in _controllers) { c.clear(); }
+      setState(() {
+        _hasError = false;
+        _resendSent = true;
+      });
+      _focusNodes[0].requestFocus();
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService.friendlyError(e)),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      setState(() => _errorMessage = AuthService.friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    // Responsive box width: fills available horizontal space minus padding and gaps
     final boxSize = ((screenWidth - 56 - 48) / 6).clamp(38.0, 52.0);
 
     return Scaffold(
@@ -174,26 +127,26 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 48),
-
                 Center(
                   child: Column(
                     children: [
                       Container(
-                        width: 72, height: 72,
+                        width: 72,
+                        height: 72,
                         decoration: BoxDecoration(
-                          color: AppColors.cyan.withOpacity(0.12),
+                          color: AppColors.cyan.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.mark_email_unread_outlined,
                             color: AppColors.cyan, size: 36),
                       ),
                       const SizedBox(height: 24),
-
-                      const Text('Enter Verification\nCode',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.heading2),
+                      const Text(
+                        'Enter Verification\nCode',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.heading2,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         "We've sent a 6-digit code to\n${widget.email}",
@@ -204,10 +157,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           height: 1.5,
                         ),
                       ),
-
                       const SizedBox(height: 40),
 
-                      // 6-digit OTP inputs – responsive width
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(6, (i) {
@@ -260,30 +211,53 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         }),
                       ),
 
-                      if (_hasError) ...[
-                        const SizedBox(height: 12),
-                        const Text('Please fill in all 6 digits',
-                            style: TextStyle(fontSize: 12, color: Colors.red)),
-                      ],
+                      const SizedBox(height: 14),
+                      if (_errorMessage != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 15, color: Colors.red),
+                            const SizedBox(width: 5),
+                            Text(
+                              _errorMessage!,
+                              style: const TextStyle(fontSize: 13, color: Colors.red),
+                            ),
+                          ],
+                        )
+                      else if (_resendSent)
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 15, color: AppColors.cyan),
+                            SizedBox(width: 5),
+                            Text(
+                              'Code resent successfully',
+                              style: TextStyle(fontSize: 13, color: AppColors.cyan),
+                            ),
+                          ],
+                        )
+                      else
+                        const SizedBox(height: 18),
 
-                      const SizedBox(height: 40),
-
+                      const SizedBox(height: 32),
                       GestureDetector(
-                        onTap: _onResend,
+                        onTap: _loading ? null : _onResend,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.inputBorder),
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: const Text('Resend Code', style: AppTextStyles.body),
+                          child: Text(
+                            _loading ? 'Resending…' : 'Resend Code',
+                            style: AppTextStyles.body,
+                          ),
                         ),
                       ),
-
                       const SizedBox(height: 20),
                       GradientButton(
-                        text: _loading ? 'Verifying…' : 'Continue',
-                        onPressed: _loading ? null : _onContinue,
+                        text: 'Continue',
+                        onPressed: _onContinue,
                       ),
                       const SizedBox(height: 32),
                     ],

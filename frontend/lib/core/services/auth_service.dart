@@ -76,6 +76,24 @@ class AuthService {
     return map;
   }
 
+  /// Sends a password-reset code to the given email via Cognito.
+  static Future<void> resetPassword(String email) async {
+    await Amplify.Auth.resetPassword(username: email);
+  }
+
+  /// Completes the password reset using the code sent to email.
+  static Future<void> confirmResetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await Amplify.Auth.confirmResetPassword(
+      username: email,
+      newPassword: newPassword,
+      confirmationCode: code,
+    );
+  }
+
   /// Updates the user's display name in Cognito.
   static Future<void> updateName(String newName) async {
     await Amplify.Auth.updateUserAttribute(

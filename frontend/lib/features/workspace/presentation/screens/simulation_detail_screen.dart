@@ -111,10 +111,30 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s['title'], style: AppTextStyles.heading1),
+                          // Scenario badge + title
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              s['scenarioNumber'] as String,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: accentColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(s['title'] as String, style: AppTextStyles.heading1),
+                          const SizedBox(height: 6),
+                          Text(s['tagline'] as String,
+                              style: const TextStyle(fontSize: 14, color: AppColors.textMedium, height: 1.5)),
                           const SizedBox(height: 20),
 
-                          // Schematic
+                          // Image placeholder — replace Container with Image.asset() when ready
                           Container(
                             width: double.infinity,
                             height: 180,
@@ -123,55 +143,34 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryBlue.withOpacity(0.07),
+                                  color: AppColors.primaryBlue.withValues(alpha: 0.07),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: s['feedType'] == 'Ethane'
-                                  ? Image.asset(
-                                      'assets/images/Ethane-cracking.jpeg',
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                    )
-                                  : Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.schema_outlined, size: 48, color: accentColor.withOpacity(0.4)),
-                                        const SizedBox(height: 8),
-                                        Text('${s['feedType']} Cracking Schematic',
-                                            style: const TextStyle(fontSize: 12, color: AppColors.textLight)),
-                                      ],
-                                    ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.image_outlined, size: 40, color: accentColor.withValues(alpha: 0.35)),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${s['scenarioNumber']} — Schematic',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textLight),
+                                ),
+                              ],
                             ),
                           ),
 
                           const SizedBox(height: 24),
 
-                          // Input parameters
-                          const Text('Input Parameters',
+                          // Scenario info cards
+                          const Text('Scenario Overview',
                               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
                           const SizedBox(height: 12),
-                          _paramCard(Icons.category_outlined, 'Feed Type', s['feedType'], accentColor),
+                          _paramCard(Icons.description_outlined, 'Description', s['description'] as String, accentColor),
                           const SizedBox(height: 10),
-                          _paramCard(Icons.thermostat_outlined, 'Temperature Range', s['tempRange'], accentColor),
-                          const SizedBox(height: 10),
-                          _paramCard(Icons.compress_outlined, 'Pressure Range', s['pressure'], accentColor),
-
-                          const SizedBox(height: 24),
-
-                          // Model description
-                          const Text('Model Description',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Advanced simulation model for analyzing and optimizing ${s['title'].toLowerCase()} operations. '
-                            'Evaluates ethylene yield, fuel duty, CO₂ emissions, and hydrogen recovery.',
-                            style: const TextStyle(fontSize: 13, color: AppColors.textMedium, height: 1.6),
-                          ),
+                          _paramCard(Icons.science_outlined, 'Reaction Basis', s['reactionBasis'] as String, accentColor),
 
                           const SizedBox(height: 24),
 
@@ -204,7 +203,7 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryBlue.withOpacity(0.07),
+                                  color: AppColors.primaryBlue.withValues(alpha: 0.07),
                                   blurRadius: 14,
                                   offset: const Offset(0, 4),
                                 ),
@@ -217,7 +216,7 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                                   width: 36,
                                   height: 36,
                                   decoration: BoxDecoration(
-                                    color: AppColors.cyan.withOpacity(0.12),
+                                    color: AppColors.cyan.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: const Icon(Icons.info_outline, color: AppColors.cyan, size: 18),
@@ -264,24 +263,26 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: AppColors.primaryBlue.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 3)),
         ],
       ),
       child: Row(
         children: [
           Container(
             width: 36, height: 36,
-            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
-              const SizedBox(height: 2),
-              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.darkBase)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.darkBase, height: 1.4)),
+              ],
+            ),
           ),
         ],
       ),
@@ -398,7 +399,7 @@ class _GlowButtonState extends State<_GlowButton>
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: widget.accentColor.withOpacity(0.55),
+                          color: widget.accentColor.withValues(alpha: 0.55),
                           blurRadius: _glowRadius.value,
                           spreadRadius: _glowRadius.value * 0.2,
                           offset: const Offset(0, 4),
@@ -445,7 +446,7 @@ class _BorderDrawPainter extends CustomPainter {
     if (progress == 0) return;
 
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.9)
+      ..color = Colors.white.withValues(alpha: 0.9)
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;

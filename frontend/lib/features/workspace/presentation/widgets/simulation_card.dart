@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class SimulationCard extends StatefulWidget {
+  final String scenarioNumber;
   final String title;
-  final String description;
+  final String tagline;
+  final String reactionBasis;
   final IconData icon;
   final Color iconColor;
   final VoidCallback onTap;
 
   const SimulationCard({
     super.key,
+    required this.scenarioNumber,
     required this.title,
-    required this.description,
+    required this.tagline,
+    required this.reactionBasis,
     required this.icon,
     required this.iconColor,
     required this.onTap,
@@ -64,50 +68,96 @@ class _SimulationCardState extends State<SimulationCard>
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryBlue.withOpacity(0.07),
+                color: AppColors.primaryBlue.withValues(alpha: 0.07),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: widget.iconColor.withOpacity(0.12),
+                  color: widget.iconColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(widget.icon, color: widget.iconColor, size: 24),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.darkBase,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(widget.description,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textLight,
-                          height: 1.4,
-                        )),
+                    // Scenario number badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: widget.iconColor.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        widget.scenarioNumber,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: widget.iconColor,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 6),
+                    // Title
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.darkBase,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    // Tagline
+                    Text(
+                      widget.tagline,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMedium,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Reaction basis row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.science_outlined, size: 12, color: AppColors.textLight),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            widget.reactionBasis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textLight,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        Text('Open Simulation',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: widget.iconColor,
-                            )),
+                        Text(
+                          'Open Simulation',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: widget.iconColor,
+                          ),
+                        ),
                         const SizedBox(width: 2),
                         Icon(Icons.arrow_forward_ios, size: 10, color: widget.iconColor),
                       ],

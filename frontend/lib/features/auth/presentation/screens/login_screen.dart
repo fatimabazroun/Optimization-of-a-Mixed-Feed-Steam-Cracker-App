@@ -7,6 +7,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../workspace/presentation/screens/main_shell.dart';
 import 'register_screen.dart';
 import 'verification_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -144,7 +145,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: GestureDetector(
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder: (_, __, ___) => const ForgotPasswordScreen(),
+                          transitionsBuilder: (_, anim, __, child) =>
+                              FadeTransition(opacity: anim, child: child),
+                          transitionDuration: const Duration(milliseconds: 300),
+                        ),
+                      ),
                       child: const Text('Forgot Password?', style: AppTextStyles.link),
                     ),
                   ),
