@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
 import 'main_shell.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/scenario_service.dart';
-import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/report_service.dart';
 import '../../../../core/services/simulation_service.dart';
 
@@ -46,8 +47,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   void initState() {
     super.initState();
     _tabs = widget.useReservoir
-        ? ['Overview', 'Performance', 'Trends', 'Recommendation']
-        : ['Overview', 'Trends', 'Recommendation'];
+        ? ['Overview', 'Performance', 'Raw KPIs', 'Recommendation']
+        : ['Overview', 'Raw KPIs', 'Recommendation'];
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -350,7 +351,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     final tab = _tabs[_selectedTab];
     if (tab == 'Overview') return _buildOverview();
     if (tab == 'Performance') return _buildPerformance(accentColor);
-    if (tab == 'Trends') return _buildTrends(accentColor);
+    if (tab == 'Raw KPIs') return _buildTrends(accentColor);
     return _buildRecommendation(accentColor);
   }
 
@@ -799,88 +800,11 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
   Widget _buildRecommendation(Color accentColor) {
     final r = _results!;
-    final feasibility = r['feasibility'] as String;
     final iseRec = (r['iseRecommendation'] as String?) ?? '';
-
-    final List<Map<String, dynamic>> items;
-    if (feasibility == 'Feasible') {
-      items = [
-        {
-          'icon': Icons.check_circle_outline,
-          'color': const Color(0xFF2ECC71),
-          'title': 'Proceed with injection',
-          'body':
-              'The reservoir can sustain the required CO₂ rate for the full project duration. No adjustments needed.'
-        },
-        {
-          'icon': Icons.monitor_heart_outlined,
-          'color': AppColors.cyan,
-          'title': 'Monitor reservoir pressure',
-          'body':
-              'Although feasible, continuous pressure monitoring is recommended to detect any unexpected behaviour early.'
-        },
-        {
-          'icon': Icons.water_drop_outlined,
-          'color': AppColors.midTone,
-          'title': 'Track plume migration',
-          'body':
-              'Periodic seismic surveys are advised to confirm the CO₂ plume stays within the modelled radius.'
-        },
-      ];
-    } else if (feasibility == 'Conditional') {
-      items = [
-        {
-          'icon': Icons.warning_amber_outlined,
-          'color': Colors.orange,
-          'title': 'Reduce injection rate',
-          'body':
-              'The reservoir can handle some injection but not for the full project duration. Consider reducing the CO₂ rate or phasing injection.'
-        },
-        {
-          'icon': Icons.hourglass_top_outlined,
-          'color': Colors.orange,
-          'title': 'Shorten project duration',
-          'body':
-              'Adjusting the project timeline to match the maximum safe injection time can make this scenario viable.'
-        },
-        {
-          'icon': Icons.add_location_alt_outlined,
-          'color': AppColors.cyan,
-          'title': 'Consider additional wells',
-          'body':
-              'Distributing the CO₂ load across more injection wells can extend the safe injection window.'
-        },
-      ];
-    } else {
-      items = [
-        {
-          'icon': Icons.cancel_outlined,
-          'color': Colors.red,
-          'title': 'Injection not recommended',
-          'body':
-              'The reservoir cannot safely handle the required CO₂ rate. Exceeding pressure limits risks fracturing and containment failure.'
-        },
-        {
-          'icon': Icons.search_outlined,
-          'color': AppColors.purple,
-          'title': 'Re-evaluate reservoir selection',
-          'body':
-              'Consider reservoirs with higher permeability, greater thickness, or lower initial pressure for safer storage.'
-        },
-        {
-          'icon': Icons.tune_outlined,
-          'color': AppColors.midTone,
-          'title': 'Revisit input parameters',
-          'body':
-              'Review CO₂ rate, number of wells, and fracture pressure estimates — small adjustments may shift the feasibility outcome.'
-        },
-      ];
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ISE optimization recommendation
         if (iseRec.isNotEmpty) ...[
           Container(
             width: double.infinity,
@@ -900,8 +824,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     color: accentColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.lightbulb_outline,
-                      color: accentColor, size: 18),
+                  child: Icon(Icons.lightbulb_outline, color: accentColor, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -925,59 +848,27 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               ],
             ),
           ),
-          const SizedBox(height: 16),
-        ],
-
-        // Reservoir recommendations (only when reservoir was run)
-        if (widget.useReservoir) ...[
-          ...items.map((item) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                      color: AppColors.primaryBlue.withValues(alpha: 0.06),
-                      blurRadius: 12,
-                      offset: const Offset(0, 3))
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: (item['color'] as Color).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(item['icon'] as IconData,
-                        color: item['color'] as Color, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item['title'] as String,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.darkBase)),
-                        const SizedBox(height: 4),
-                        Text(item['body'] as String,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textMedium,
-                                height: 1.5)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            )),
+        ] else ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.lightbulb_outline, size: 40, color: AppColors.highlight),
+                SizedBox(height: 12),
+                Text('No recommendation available',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textMedium)),
+                SizedBox(height: 6),
+                Text('Run a simulation to receive optimization guidance.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+              ],
+            ),
+          ),
         ],
       ],
     );
@@ -1091,57 +982,169 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   }
 
   Future<void> _generateReport(BuildContext context) async {
-    // Show loading snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                  color: Colors.white, strokeWidth: 2),
+    if (_results == null) return;
+    final accentColor = widget.scenario['color'] as Color;
+
+    // ── Liquid glass loading dialog ───────────────────────────────────────────
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: accentColor.withValues(alpha: 0.18), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.18),
+                  blurRadius: 40,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            SizedBox(width: 12),
-            Text('Generating PDF report…'),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: CircularProgressIndicator(
+                        color: accentColor, strokeWidth: 2.5),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Generating Report',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.darkBase)),
+                const SizedBox(height: 8),
+                const Text('Building your PDF, this may take\na few seconds…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMedium,
+                        height: 1.5)),
+              ],
+            ),
+          ),
         ),
-        backgroundColor: AppColors.cyan,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
 
     try {
-      final r = _results!;
-      final attrs = await AuthService.fetchUserAttributes();
-      await ReportService.generateAndShare(
-        scenarioTitle: widget.scenario['title'] as String,
-        feedType: widget.scenario['feedType'] as String? ?? '',
+      final url = await ReportService.generateReport(
+        scenario: widget.scenario['title'] as String,
         temperature: widget.temperature,
         pressure: widget.pressure,
-        overallStatus: r['feasibility'] as String,
-        tempStatus: r['feasibility'] as String,
-        tempMessage: r['feasibilityMessage'] as String,
-        pressureStatus: r['feasibility'] as String,
-        pressureMessage: r['feasibilityMessage'] as String,
-        ethyleneYield: r['ethyleneYield'] as double,
-        co2Emissions: r['co2Rate'] as double,
-        fuelDuty: r['furnaceReduction'] as double,
-        h2Recovery: r['hydrogenPurity'] as double,
-        userName: attrs['name'] ?? '',
-        userEmail: attrs['email'] ?? '',
+        scenarioId: widget.scenarioId,
+        selectedValue: widget.selectedValue,
+        useReservoir: widget.useReservoir,
+        results: _results!,
+      );
+
+      final response = await http.get(Uri.parse(url));
+      final bytes = response.bodyBytes;
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading dialog
+
+      await Printing.layoutPdf(
+        onLayout: (_) async => bytes,
+        name: '${widget.scenario['title']}_Report',
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to generate report. Please try again.'),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      Navigator.pop(context); // close loading dialog
+
+      // ── Liquid glass error dialog ─────────────────────────────────────────
+      showDialog(
+        context: context,
+        builder: (_) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                    color: Colors.red.withValues(alpha: 0.20), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    blurRadius: 40,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.error_outline,
+                        color: Colors.red, size: 28),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Report Failed',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkBase)),
+                  const SizedBox(height: 8),
+                  const Text('Could not generate the PDF report.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
+                  const SizedBox(height: 8),
+                  Text(e.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textLight,
+                          height: 1.4)),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.darkBase,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text('Dismiss',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
