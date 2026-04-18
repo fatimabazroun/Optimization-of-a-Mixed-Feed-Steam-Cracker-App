@@ -4,21 +4,31 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/scenario_service.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/report_service.dart';
+import '../../../../core/services/simulation_service.dart';
 
 class SimulationResultsScreen extends StatefulWidget {
   final Map<String, dynamic> scenario;
   final String temperature;
   final String pressure;
+  final String scenarioId;
+  final dynamic selectedValue;
+  final bool useReservoir;
+  final Map<String, dynamic>? reservoirInputs;
 
   const SimulationResultsScreen({
     super.key,
     required this.scenario,
     required this.temperature,
     required this.pressure,
+    required this.scenarioId,
+    required this.selectedValue,
+    this.useReservoir = false,
+    this.reservoirInputs,
   });
 
   @override
-  State<SimulationResultsScreen> createState() => _SimulationResultsScreenState();
+  State<SimulationResultsScreen> createState() =>
+      _SimulationResultsScreenState();
 }
 
 class _SimulationResultsScreenState extends State<SimulationResultsScreen>
@@ -26,74 +36,99 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   late AnimationController _fadeController;
   late Animation<double> _fade;
   int _selectedTab = 0;
-  final List<String> _tabs = ['Overview', 'Performance', 'Trends', 'Recommendation'];
+  late final List<String> _tabs;
 
-  // Determine status and KPI values based on temp & pressure
-  late final Map<String, dynamic> _results;
+  Map<String, dynamic>? _results;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
+    _tabs = widget.useReservoir
+        ? ['Overview', 'Performance', 'Trends', 'Recommendation']
+        : ['Overview', 'Trends', 'Recommendation'];
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
     _fade = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
     _fadeController.forward();
-    _results = _computeResults();
+    _loadResults();
   }
 
-  Map<String, dynamic> _computeResults() {
-    final temp = double.tryParse(widget.temperature) ?? 850;
-    final pressure = double.tryParse(widget.pressure) ?? 1.5;
+  Future<void> _loadResults() async {
+    try {
+      final data = await SimulationService.runSimulation(
+        scenarioId: widget.scenarioId,
+        selectedValue: widget.selectedValue,
+        useReservoir: widget.useReservoir,
+        reservoirInputs: widget.reservoirInputs,
+      );
+      if (mounted) {
+        setState(() {
+          _results = _mapApiResponse(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-    // Estimated cracking KPIs
-    final ethyleneYield = temp >= 820 && temp <= 880 ? 32.5 : temp >= 900 ? 24.1 : 15.3;
-    final co2Emissions  = pressure <= 1.5 ? 388.0 : pressure <= 4 ? 432.0 : 510.0;
-    final fuelDuty      = temp >= 820 ? 12.4 : 8.9;
-    final h2Recovery    = temp >= 820 && temp <= 880 ? 78.5 : 61.2;
+  Map<String, dynamic> _mapApiResponse(Map<String, dynamic> data) {
+    final r = data['results'] as Map<String, dynamic>;
+    final perf = data['performance'] as Map<String, dynamic>;
 
-    // Cracking overview KPIs (placeholder — replace with backend values)
-    final furnaceReduction = temp >= 820 && temp <= 880 ? 18.3 : temp >= 900 ? 12.7 : 7.4; // %
-    final cost             = pressure <= 1.5 ? 142.0 : pressure <= 4 ? 167.0 : 198.0;       // $/tonne
-    final hydrogenPurity   = temp >= 820 && temp <= 880 ? 94.2 : temp >= 900 ? 88.6 : 79.1; // %
+    final ethyleneYield = (r['ethylene_yield_percent'] as num).toDouble();
+    final furnaceReduction = (r['furnace_reduction_percent'] as num).toDouble();
+    final costSaving = (r['cost_saving_percent'] as num).toDouble();
+    final hydrogenPurity = (r['hydrogen_purity_percent'] as num).toDouble();
+    final co2Rate = (r['co2_rate'] as num).toDouble();
 
-    // ── PETE outputs (placeholder — replace with backend values) ──
-    const double maxInjectionTime    = 18.5;   // years
-    const double pressureAtEnd       = 28.4;   // MPa
-    const double maxSustainableRate  = 1850.0; // kg/hr
-    const double plumeRadius         = 2340.0; // m
-
-    // Feasibility classification
-    // Feasible: injection time covers full project duration (assume 20 yr default)
-    // Conditional: some capacity but not full duration
-    // Infeasible: cannot safely inject
-    const String feasibility = 'Feasible'; // swap with backend result
-    const Color  feasibilityColor = Color(0xFF2ECC71);
-    const IconData feasibilityIcon = Icons.check_circle_outline;
-    const String feasibilityMessage = 'Reservoir can sustain the required CO₂ rate for the full project duration without exceeding pressure limits.';
+    // Reservoir results (only present when use_reservoir=true)
+    final res = data['reservoir'] as Map<String, dynamic>?;
+    final feasibility = res != null ? res['status'] as String : 'N/A';
+    final Color feasColor;
+    final IconData feasIcon;
+    if (feasibility == 'Feasible') {
+      feasColor = const Color(0xFF2ECC71);
+      feasIcon = Icons.check_circle_outline;
+    } else if (feasibility == 'Conditional') {
+      feasColor = const Color(0xFFF39C12);
+      feasIcon = Icons.warning_amber_outlined;
+    } else if (feasibility == 'Infeasible') {
+      feasColor = const Color(0xFFE74C3C);
+      feasIcon = Icons.cancel_outlined;
+    } else {
+      feasColor = AppColors.textLight;
+      feasIcon = Icons.hourglass_empty_outlined;
+    }
 
     return {
-      'overallStatus':       feasibility,
-      'overallColor':        feasibilityColor,
-      'overallIcon':         feasibilityIcon,
-      // PETE
-      'feasibility':         feasibility,
-      'feasibilityColor':    feasibilityColor,
-      'feasibilityIcon':     feasibilityIcon,
-      'feasibilityMessage':  feasibilityMessage,
-      'maxInjectionTime':    maxInjectionTime,
-      'pressureAtEnd':       pressureAtEnd,
-      'maxSustainableRate':  maxSustainableRate,
-      'plumeRadius':         plumeRadius,
-      // Cracking KPIs
-      'ethyleneYield':    ethyleneYield,
-      'co2Emissions':     co2Emissions,
-      'fuelDuty':         fuelDuty,
-      'h2Recovery':       h2Recovery,
+      'ethyleneYield': ethyleneYield,
       'furnaceReduction': furnaceReduction,
-      'cost':             cost,
-      'hydrogenPurity':   hydrogenPurity,
+      'costSaving': costSaving,
+      'hydrogenPurity': hydrogenPurity,
+      'co2Rate': co2Rate,
+      'performance': perf,
+      'feasibility': feasibility,
+      'feasibilityColor': feasColor,
+      'feasibilityIcon': feasIcon,
+      'feasibilityMessage': res?['feasibility_message'] as String? ?? '',
+      'maxInjectionTime':
+          (res?['max_safe_injection_time_years'] as num? ?? 0).toDouble(),
+      'pressureAtEnd':
+          (res?['final_pressure_mpa'] as num? ?? 0).toDouble(),
+      'maxSustainableRate':
+          (res?['max_sustainable_rate_kg_hr'] as num? ?? 0).toDouble(),
+      'plumeRadius':
+          (res?['estimated_plume_radius_m'] as num? ?? 0).toDouble(),
     };
   }
 
@@ -117,14 +152,17 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               children: [
                 // Header
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: const Row(
                       children: [
-                        Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                        Icon(Icons.arrow_back_ios,
+                            size: 16, color: AppColors.textMedium),
                         SizedBox(width: 4),
-                        Text('Back to Configuration', style: AppTextStyles.body),
+                        Text('Back to Configuration',
+                            style: AppTextStyles.body),
                       ],
                     ),
                   ),
@@ -136,7 +174,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Simulation Results', style: AppTextStyles.heading1),
+                        const Text('Simulation Results',
+                            style: AppTextStyles.heading1),
                         const SizedBox(height: 20),
 
                         // Tabs
@@ -152,14 +191,19 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                               children: _tabs.asMap().entries.map((e) {
                                 final selected = _selectedTab == e.key;
                                 return GestureDetector(
-                                  onTap: () => setState(() => _selectedTab = e.key),
+                                  onTap: () =>
+                                      setState(() => _selectedTab = e.key),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 18, vertical: 10),
                                     decoration: BoxDecoration(
                                       gradient: selected
                                           ? LinearGradient(
-                                              colors: [accentColor, AppColors.primaryBlue],
+                                              colors: [
+                                                accentColor,
+                                                AppColors.primaryBlue
+                                              ],
                                               begin: Alignment.centerLeft,
                                               end: Alignment.centerRight,
                                             )
@@ -170,7 +214,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
-                                          color: selected ? Colors.white : AppColors.textLight,
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.textLight,
                                         )),
                                   ),
                                 );
@@ -182,21 +228,39 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                         const SizedBox(height: 20),
 
                         // Tab content
-                        if (_selectedTab == 0) _buildOverview(),
-                        if (_selectedTab == 1) _buildPerformance(accentColor),
-                        if (_selectedTab == 2) _buildTrends(accentColor),
-                        if (_selectedTab == 3) _buildRecommendation(accentColor),
+                        if (_isLoading)
+                          _buildLoadingState(accentColor)
+                        else if (_error != null)
+                          _buildErrorState(accentColor)
+                        else
+                          _buildTabContent(accentColor),
 
                         const SizedBox(height: 24),
 
                         // Action buttons
                         Row(
                           children: [
-                            Expanded(child: _GlowActionButton(icon: Icons.bookmark_outline, label: 'Save', accentColor: accentColor, onTap: () => _showSaveDialog(context, accentColor))),
+                            Expanded(
+                                child: _GlowActionButton(
+                                    icon: Icons.bookmark_outline,
+                                    label: 'Save',
+                                    accentColor: accentColor,
+                                    onTap: () =>
+                                        _showSaveDialog(context, accentColor))),
                             const SizedBox(width: 12),
-                            Expanded(child: _GlowActionButton(icon: Icons.download_outlined, label: 'Report', accentColor: accentColor, onTap: () => _generateReport(context))),
+                            Expanded(
+                                child: _GlowActionButton(
+                                    icon: Icons.download_outlined,
+                                    label: 'Report',
+                                    accentColor: accentColor,
+                                    onTap: () => _generateReport(context))),
                             const SizedBox(width: 12),
-                            Expanded(child: _GlowActionButton(icon: Icons.refresh_rounded, label: 'Recalculate', accentColor: accentColor, onTap: () => Navigator.pop(context))),
+                            Expanded(
+                                child: _GlowActionButton(
+                                    icon: Icons.refresh_rounded,
+                                    label: 'Recalculate',
+                                    accentColor: accentColor,
+                                    onTap: () => Navigator.pop(context))),
                           ],
                         ),
 
@@ -213,155 +277,354 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
   }
 
+  Widget _buildLoadingState(Color accentColor) {
+    return Container(
+      height: 260,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: accentColor, strokeWidth: 2.5),
+          const SizedBox(height: 20),
+          const Text('Running simulation…',
+              style: TextStyle(fontSize: 14, color: AppColors.textMedium)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 36),
+          const SizedBox(height: 12),
+          const Text('Simulation failed',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkBase)),
+          const SizedBox(height: 8),
+          Text(_error ?? 'Unknown error',
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(fontSize: 12, color: AppColors.textMedium)),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isLoading = true;
+                _error = null;
+              });
+              _loadResults();
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                  color: accentColor, borderRadius: BorderRadius.circular(10)),
+              child: const Text('Retry',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabContent(Color accentColor) {
+    final tab = _tabs[_selectedTab];
+    if (tab == 'Overview') return _buildOverview();
+    if (tab == 'Performance') return _buildPerformance(accentColor);
+    if (tab == 'Trends') return _buildTrends(accentColor);
+    return _buildRecommendation(accentColor);
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Not Acceptable':
+      case 'Risky':
+      case 'Infeasible':
+        return const Color(0xFFE74C3C);
+      case 'Needs Improvement':
+      case 'Minor Improvement':
+      case 'Moderate Performance':
+      case 'Moderate Improvement':
+      case 'Conditional':
+        return const Color(0xFFF39C12);
+      default:
+        return const Color(0xFF2ECC71);
+    }
+  }
+
   Widget _buildOverview() {
-    final feasColor  = _results['feasibilityColor'] as Color;
-    final feasIcon   = _results['feasibilityIcon'] as IconData;
-    final feasLabel  = _results['feasibility'] as String;
-    final feasMsg    = _results['feasibilityMessage'] as String;
+    final r = _results!;
+    final perf = r['performance'] as Map<String, dynamic>;
+
+    Map<String, dynamic> perfFor(String key) =>
+        perf[key] as Map<String, dynamic>;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 1. Feasibility Result (most important) ──
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: feasColor.withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: feasColor.withValues(alpha: 0.35), width: 1.5),
-            boxShadow: [BoxShadow(color: feasColor.withValues(alpha: 0.10), blurRadius: 14, offset: const Offset(0, 4))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // ── Cracking Performance (always first) ──
+        const Text('Cracking Performance',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.darkBase)),
+        const SizedBox(height: 12),
+
+        _cheMetricCard(
+          label: 'Ethylene Yield',
+          value: (r['ethyleneYield'] as double).toStringAsFixed(1),
+          unit: '%',
+          icon: Icons.bubble_chart_outlined,
+          color: AppColors.cyan,
+          perf: perfFor('ethylene_yield'),
+        ),
+        const SizedBox(height: 10),
+        _cheMetricCard(
+          label: 'Furnace Reduction',
+          value: (r['furnaceReduction'] as double).toStringAsFixed(1),
+          unit: '%',
+          icon: Icons.local_fire_department_outlined,
+          color: Colors.orange,
+          perf: perfFor('furnace_reduction'),
+        ),
+        const SizedBox(height: 10),
+        _cheMetricCard(
+          label: 'Cost Saving',
+          value: (r['costSaving'] as double).toStringAsFixed(1),
+          unit: '%',
+          icon: Icons.attach_money_outlined,
+          color: AppColors.purple,
+          perf: perfFor('cost_saving'),
+        ),
+        const SizedBox(height: 10),
+        _cheMetricCard(
+          label: 'Hydrogen Purity',
+          value: (r['hydrogenPurity'] as double).toStringAsFixed(1),
+          unit: '%',
+          icon: Icons.science_outlined,
+          color: AppColors.midTone,
+          perf: perfFor('hydrogen_purity'),
+        ),
+
+        // ── CO₂ Storage (only when reservoir was run) ──
+        if (widget.useReservoir) ...[
+          const SizedBox(height: 20),
+          _buildFeasibilityCard(r),
+          const SizedBox(height: 14),
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: feasColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('MOST IMPORTANT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textLight, letterSpacing: 0.5)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(feasIcon, color: feasColor, size: 28),
-                  const SizedBox(width: 12),
-                  Text('Feasibility Result',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textLight)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(feasLabel,
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: feasColor)),
-              const SizedBox(height: 8),
-              Text(feasMsg,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.5)),
+              Expanded(
+                  child: _peteMetricCard(
+                label: 'Max Safe\nInjection Time',
+                value: (r['maxInjectionTime'] as double).toStringAsFixed(1),
+                unit: 'years',
+                icon: Icons.timer_outlined,
+                description:
+                    'How long we can inject before reaching the pressure limit.',
+                color: AppColors.cyan,
+              )),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _peteMetricCard(
+                label: 'Pressure at\nProject End',
+                value: (r['pressureAtEnd'] as double).toStringAsFixed(1),
+                unit: 'MPa',
+                icon: Icons.compress_outlined,
+                description:
+                    'Reservoir pressure at the end of the full project duration.',
+                color: AppColors.purple,
+              )),
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                  child: _peteMetricCard(
+                label: 'Max Sustainable\nInjection Rate',
+                value: (r['maxSustainableRate'] as double).toStringAsFixed(0),
+                unit: 'kg/hr',
+                icon: Icons.speed_outlined,
+                description:
+                    'Maximum CO₂ rate the reservoir can handle safely.',
+                color: AppColors.midTone,
+              )),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _peteMetricCard(
+                label: 'Plume\nRadius',
+                value: (r['plumeRadius'] as double).toStringAsFixed(0),
+                unit: 'm',
+                icon: Icons.radar_outlined,
+                description:
+                    'How large the CO₂ plume becomes by end of project.',
+                color: const Color(0xFF2ECC71),
+              )),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
 
-        const SizedBox(height: 14),
-
-        // ── 2–5. Metric cards in 2×2 grid ──
-        Row(
-          children: [
-            Expanded(child: _peteMetricCard(
-              label: 'Max Safe\nInjection Time',
-              value: (_results['maxInjectionTime'] as double).toStringAsFixed(1),
-              unit: 'years',
-              icon: Icons.timer_outlined,
-              description: 'How long we can inject before reaching the pressure limit.',
-              color: AppColors.cyan,
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _peteMetricCard(
-              label: 'Pressure at\nProject End',
-              value: (_results['pressureAtEnd'] as double).toStringAsFixed(1),
-              unit: 'MPa',
-              icon: Icons.compress_outlined,
-              description: 'Reservoir pressure at the end of the full project duration.',
-              color: AppColors.purple,
-            )),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _peteMetricCard(
-              label: 'Max Sustainable\nInjection Rate',
-              value: (_results['maxSustainableRate'] as double).toStringAsFixed(0),
-              unit: 'kg/hr',
-              icon: Icons.speed_outlined,
-              description: 'Maximum CO₂ rate the reservoir can handle safely.',
-              color: AppColors.midTone,
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _peteMetricCard(
-              label: 'Plume\nRadius',
-              value: (_results['plumeRadius'] as double).toStringAsFixed(0),
-              unit: 'm',
-              icon: Icons.radar_outlined,
-              description: 'How large the CO₂ plume becomes by end of project.',
-              color: const Color(0xFF2ECC71),
-            )),
-          ],
-        ),
-
-        const SizedBox(height: 20),
-        const Text('Cracking Performance',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-        const SizedBox(height: 12),
-
-        Row(
-          children: [
-            Expanded(child: _peteMetricCard(
-              label: 'Ethylene\nYield',
-              value: (_results['ethyleneYield'] as double).toStringAsFixed(1),
-              unit: '%',
-              icon: Icons.bubble_chart_outlined,
-              description: 'Mass fraction of ethylene produced relative to total feed.',
-              color: AppColors.cyan,
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _peteMetricCard(
-              label: 'Furnace\nReduction',
-              value: (_results['furnaceReduction'] as double).toStringAsFixed(1),
-              unit: '%',
-              icon: Icons.local_fire_department_outlined,
-              description: 'Reduction in furnace fuel duty vs baseline operation.',
-              color: Colors.orange,
-            )),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _peteMetricCard(
-              label: 'Operating\nCost',
-              value: (_results['cost'] as double).toStringAsFixed(0),
-              unit: '\$/t',
-              icon: Icons.attach_money_outlined,
-              description: 'Estimated operating cost per tonne of ethylene produced.',
-              color: AppColors.purple,
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _peteMetricCard(
-              label: 'Hydrogen\nPurity',
-              value: (_results['hydrogenPurity'] as double).toStringAsFixed(1),
-              unit: '%',
-              icon: Icons.science_outlined,
-              description: 'Purity of recovered hydrogen as a by-product stream.',
-              color: AppColors.midTone,
-            )),
-          ],
-        ),
       ],
+    );
+  }
+
+  Widget _buildFeasibilityCard(Map<String, dynamic> r) {
+    final feasColor = r['feasibilityColor'] as Color;
+    final feasIcon = r['feasibilityIcon'] as IconData;
+    final feasLabel = r['feasibility'] as String;
+    final feasMsg = r['feasibilityMessage'] as String;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: feasColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: feasColor.withValues(alpha: 0.35), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+              color: feasColor.withValues(alpha: 0.10),
+              blurRadius: 14,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: feasColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text('CO₂ STORAGE FEASIBILITY',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textLight,
+                    letterSpacing: 0.5)),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(feasIcon, color: feasColor, size: 28),
+              const SizedBox(width: 12),
+              Text(feasLabel,
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: feasColor)),
+            ],
+          ),
+          if (feasMsg.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(feasMsg,
+                style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMedium,
+                    height: 1.5)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _cheMetricCard({
+    required String label,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required Color color,
+    required Map<String, dynamic> perf,
+  }) {
+    final status = perf['status'] as String;
+    final explanation = perf['explanation'] as String;
+    final statusColor = _statusColor(status);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+              color: color.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.darkBase)),
+                    const Spacer(),
+                    Text('$value $unit',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: color)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(status,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor)),
+                ),
+                const SizedBox(height: 6),
+                Text(explanation,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textLight,
+                        height: 1.4)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -379,7 +642,12 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.07), blurRadius: 12, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+              color: color.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,28 +655,42 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           Row(
             children: [
               Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9)),
                 child: Icon(icon, color: color, size: 17),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textLight, height: 1.4))),
+              Expanded(
+                  child: Text(label,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textLight,
+                          height: 1.4))),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: color)),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.w800, color: color)),
               const SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
-                child: Text(unit, style: const TextStyle(fontSize: 12, color: AppColors.textMedium)),
+                child: Text(unit,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textMedium)),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(description, style: const TextStyle(fontSize: 10, color: AppColors.textLight, height: 1.4)),
+          Text(description,
+              style: const TextStyle(
+                  fontSize: 10, color: AppColors.textLight, height: 1.4)),
         ],
       ),
     );
@@ -419,14 +701,16 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       children: [
         _chartPlaceholder(
           title: 'Pressure vs Time',
-          description: 'Shows how reservoir pressure increases over time and where it hits the allowable limit.',
+          description:
+              'Shows how reservoir pressure increases over time and where it hits the allowable limit.',
           icon: Icons.show_chart_rounded,
           accentColor: accentColor,
         ),
         const SizedBox(height: 16),
         _chartPlaceholder(
           title: 'Plume Radius vs Time',
-          description: 'Shows how the CO₂ plume spreads in the reservoir over the project duration.',
+          description:
+              'Shows how the CO₂ plume spreads in the reservoir over the project duration.',
           icon: Icons.radar_outlined,
           accentColor: AppColors.cyan,
         ),
@@ -446,7 +730,12 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.07), blurRadius: 16, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.primaryBlue.withValues(alpha: 0.07),
+              blurRadius: 16,
+              offset: const Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,12 +743,19 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           Row(
             children: [
               Container(
-                width: 34, height: 34,
-                decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10)),
                 child: Icon(icon, color: accentColor, size: 18),
               ),
               const SizedBox(width: 12),
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.darkBase)),
             ],
           ),
           const SizedBox(height: 12),
@@ -474,42 +770,103 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.insert_chart_outlined_rounded, size: 36, color: accentColor.withValues(alpha: 0.3)),
+                  Icon(Icons.insert_chart_outlined_rounded,
+                      size: 36, color: accentColor.withValues(alpha: 0.3)),
                   const SizedBox(height: 8),
-                  Text('Chart coming soon', style: TextStyle(fontSize: 12, color: accentColor.withValues(alpha: 0.5))),
+                  Text('Chart coming soon',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: accentColor.withValues(alpha: 0.5))),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 10),
-          Text(description, style: const TextStyle(fontSize: 11, color: AppColors.textLight, height: 1.5)),
+          Text(description,
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textLight, height: 1.5)),
         ],
       ),
     );
   }
 
   Widget _buildRecommendation(Color accentColor) {
-    final feasibility = _results['feasibility'] as String;
-    final feasColor   = _results['feasibilityColor'] as Color;
+    final r = _results!;
+    final feasibility = r['feasibility'] as String;
+    final feasColor = r['feasibilityColor'] as Color;
 
     final List<Map<String, dynamic>> items;
     if (feasibility == 'Feasible') {
       items = [
-        {'icon': Icons.check_circle_outline, 'color': const Color(0xFF2ECC71), 'title': 'Proceed with injection', 'body': 'The reservoir can sustain the required CO₂ rate for the full project duration. No adjustments needed.'},
-        {'icon': Icons.monitor_heart_outlined, 'color': AppColors.cyan, 'title': 'Monitor reservoir pressure', 'body': 'Although feasible, continuous pressure monitoring is recommended to detect any unexpected behaviour early.'},
-        {'icon': Icons.water_drop_outlined, 'color': AppColors.midTone, 'title': 'Track plume migration', 'body': 'Periodic seismic surveys are advised to confirm the CO₂ plume stays within the modelled radius.'},
+        {
+          'icon': Icons.check_circle_outline,
+          'color': const Color(0xFF2ECC71),
+          'title': 'Proceed with injection',
+          'body':
+              'The reservoir can sustain the required CO₂ rate for the full project duration. No adjustments needed.'
+        },
+        {
+          'icon': Icons.monitor_heart_outlined,
+          'color': AppColors.cyan,
+          'title': 'Monitor reservoir pressure',
+          'body':
+              'Although feasible, continuous pressure monitoring is recommended to detect any unexpected behaviour early.'
+        },
+        {
+          'icon': Icons.water_drop_outlined,
+          'color': AppColors.midTone,
+          'title': 'Track plume migration',
+          'body':
+              'Periodic seismic surveys are advised to confirm the CO₂ plume stays within the modelled radius.'
+        },
       ];
     } else if (feasibility == 'Conditional') {
       items = [
-        {'icon': Icons.warning_amber_outlined, 'color': Colors.orange, 'title': 'Reduce injection rate', 'body': 'The reservoir can handle some injection but not for the full project duration. Consider reducing the CO₂ rate or phasing injection.'},
-        {'icon': Icons.hourglass_top_outlined, 'color': Colors.orange, 'title': 'Shorten project duration', 'body': 'Adjusting the project timeline to match the maximum safe injection time can make this scenario viable.'},
-        {'icon': Icons.add_location_alt_outlined, 'color': AppColors.cyan, 'title': 'Consider additional wells', 'body': 'Distributing the CO₂ load across more injection wells can extend the safe injection window.'},
+        {
+          'icon': Icons.warning_amber_outlined,
+          'color': Colors.orange,
+          'title': 'Reduce injection rate',
+          'body':
+              'The reservoir can handle some injection but not for the full project duration. Consider reducing the CO₂ rate or phasing injection.'
+        },
+        {
+          'icon': Icons.hourglass_top_outlined,
+          'color': Colors.orange,
+          'title': 'Shorten project duration',
+          'body':
+              'Adjusting the project timeline to match the maximum safe injection time can make this scenario viable.'
+        },
+        {
+          'icon': Icons.add_location_alt_outlined,
+          'color': AppColors.cyan,
+          'title': 'Consider additional wells',
+          'body':
+              'Distributing the CO₂ load across more injection wells can extend the safe injection window.'
+        },
       ];
     } else {
       items = [
-        {'icon': Icons.cancel_outlined, 'color': Colors.red, 'title': 'Injection not recommended', 'body': 'The reservoir cannot safely handle the required CO₂ rate. Exceeding pressure limits risks fracturing and containment failure.'},
-        {'icon': Icons.search_outlined, 'color': AppColors.purple, 'title': 'Re-evaluate reservoir selection', 'body': 'Consider reservoirs with higher permeability, greater thickness, or lower initial pressure for safer storage.'},
-        {'icon': Icons.tune_outlined, 'color': AppColors.midTone, 'title': 'Revisit input parameters', 'body': 'Review CO₂ rate, number of wells, and fracture pressure estimates — small adjustments may shift the feasibility outcome.'},
+        {
+          'icon': Icons.cancel_outlined,
+          'color': Colors.red,
+          'title': 'Injection not recommended',
+          'body':
+              'The reservoir cannot safely handle the required CO₂ rate. Exceeding pressure limits risks fracturing and containment failure.'
+        },
+        {
+          'icon': Icons.search_outlined,
+          'color': AppColors.purple,
+          'title': 'Re-evaluate reservoir selection',
+          'body':
+              'Consider reservoirs with higher permeability, greater thickness, or lower initial pressure for safer storage.'
+        },
+        {
+          'icon': Icons.tune_outlined,
+          'color': AppColors.midTone,
+          'title': 'Revisit input parameters',
+          'body':
+              'Review CO₂ rate, number of wells, and fracture pressure estimates — small adjustments may shift the feasibility outcome.'
+        },
       ];
     }
 
@@ -526,49 +883,66 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           ),
           child: Row(
             children: [
-              Icon(_results['feasibilityIcon'] as IconData, color: feasColor, size: 18),
+              Icon(r['feasibilityIcon'] as IconData,
+                  color: feasColor, size: 18),
               const SizedBox(width: 10),
               Text('Result: $feasibility',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: feasColor)),
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: feasColor)),
             ],
           ),
         ),
         const SizedBox(height: 16),
         ...items.map((item) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 3))],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34, height: 34,
-                decoration: BoxDecoration(
-                  color: (item['color'] as Color).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(item['icon'] as IconData, color: item['color'] as Color, size: 18),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.primaryBlue.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3))
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item['title'] as String,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                    const SizedBox(height: 4),
-                    Text(item['body'] as String,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.5)),
-                  ],
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: (item['color'] as Color).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(item['icon'] as IconData,
+                        color: item['color'] as Color, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item['title'] as String,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.darkBase)),
+                        const SizedBox(height: 4),
+                        Text(item['body'] as String,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMedium,
+                                height: 1.5)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        )),
+            )),
       ],
     );
   }
@@ -580,22 +954,32 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.07), blurRadius: 16, offset: const Offset(0, 4)),
+          BoxShadow(
+              color: AppColors.primaryBlue.withValues(alpha: 0.07),
+              blurRadius: 16,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Trend Analysis',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkBase)),
           const SizedBox(height: 16),
-          _trendRow('Ethylene Yield', _results['ethyleneYield'] / 40, accentColor),
+          _trendRow('Ethylene Yield',
+              (_results!['ethyleneYield'] as double) / 100, accentColor),
           const SizedBox(height: 12),
-          _trendRow('H₂ Recovery', _results['h2Recovery'] / 100, AppColors.cyan),
+          _trendRow('H₂ Purity',
+              (_results!['hydrogenPurity'] as double) / 100, AppColors.cyan),
           const SizedBox(height: 12),
-          _trendRow('CO₂ Efficiency', (1 - (_results['co2Emissions'] as double) / 600).toDouble(), Colors.orange),
+          _trendRow('Furnace Reduction',
+              (_results!['furnaceReduction'] as double) / 100, Colors.orange),
           const SizedBox(height: 12),
-          _trendRow('Fuel Efficiency', (1 - (_results['fuelDuty'] as double) / 20).toDouble(), AppColors.purple),
+          _trendRow('Cost Saving',
+              (_results!['costSaving'] as double) / 100, AppColors.purple),
         ],
       ),
     );
@@ -609,9 +993,12 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMedium)),
+            Text(label,
+                style:
+                    const TextStyle(fontSize: 12, color: AppColors.textMedium)),
             Text('${(clamped * 100).toStringAsFixed(0)}%',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: color)),
           ],
         ),
         const SizedBox(height: 6),
@@ -628,9 +1015,6 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
   }
 
-
-
-
   Future<void> _generateReport(BuildContext context) async {
     // Show loading snackbar
     ScaffoldMessenger.of(context).showSnackBar(
@@ -638,8 +1022,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         content: const Row(
           children: [
             SizedBox(
-              width: 16, height: 16,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  color: Colors.white, strokeWidth: 2),
             ),
             SizedBox(width: 12),
             Text('Generating PDF report…'),
@@ -653,21 +1039,22 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
 
     try {
+      final r = _results!;
       final attrs = await AuthService.fetchUserAttributes();
       await ReportService.generateAndShare(
         scenarioTitle: widget.scenario['title'] as String,
         feedType: widget.scenario['feedType'] as String? ?? '',
         temperature: widget.temperature,
         pressure: widget.pressure,
-        overallStatus: _results['overallStatus'] as String,
-        tempStatus: _results['feasibility'] as String,
-        tempMessage: _results['feasibilityMessage'] as String,
-        pressureStatus: _results['feasibility'] as String,
-        pressureMessage: _results['feasibilityMessage'] as String,
-        ethyleneYield: _results['ethyleneYield'] as double,
-        co2Emissions: _results['co2Emissions'] as double,
-        fuelDuty: _results['fuelDuty'] as double,
-        h2Recovery: _results['h2Recovery'] as double,
+        overallStatus: r['feasibility'] as String,
+        tempStatus: r['feasibility'] as String,
+        tempMessage: r['feasibilityMessage'] as String,
+        pressureStatus: r['feasibility'] as String,
+        pressureMessage: r['feasibilityMessage'] as String,
+        ethyleneYield: r['ethyleneYield'] as double,
+        co2Emissions: r['co2Rate'] as double,
+        fuelDuty: r['furnaceReduction'] as double,
+        h2Recovery: r['hydrogenPurity'] as double,
         userName: attrs['name'] ?? '',
         userEmail: attrs['email'] ?? '',
       );
@@ -678,7 +1065,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           content: const Text('Failed to generate report. Please try again.'),
           backgroundColor: Colors.red.shade400,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -686,7 +1074,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
   void _showSaveDialog(BuildContext context, Color accentColor) {
     final nameController = TextEditingController(
-      text: '${widget.scenario['title']} – ${DateTime.now().day} ${_monthName(DateTime.now().month)} ${DateTime.now().year}',
+      text:
+          '${widget.scenario['title']} – ${DateTime.now().day} ${_monthName(DateTime.now().month)} ${DateTime.now().year}',
     );
 
     showDialog(
@@ -694,7 +1083,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Save Scenario',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+            style: TextStyle(
+                fontWeight: FontWeight.w700, color: AppColors.darkBase)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,7 +1105,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
           ],
@@ -728,7 +1119,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () {
               final name = nameController.text.trim();
@@ -747,17 +1139,23 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     try {
       final now = DateTime.now();
       final simId = 'SIM-${now.year}-${now.millisecondsSinceEpoch % 10000}';
-      final date = '${_monthName(now.month)} ${now.day}, ${now.year} at ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      final date =
+          '${_monthName(now.month)} ${now.day}, ${now.year} at ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
       await ScenarioService.addScenario({
         'name': name,
         'date': date,
         'simId': simId,
-        'status': _results['overallStatus'].toString().contains('Optimal') ? 'Optimal'
-            : _results['overallStatus'].toString().contains('Warning') ? 'Warning' : 'Critical',
+        'status': (_results!['feasibility'] as String) == 'Feasible'
+            ? 'Optimal'
+            : (_results!['feasibility'] as String) == 'Conditional'
+                ? 'Warning'
+                : 'Critical',
         'temperature': widget.temperature,
         'pressure': widget.pressure,
         'scenario': widget.scenario['title'],
+        'scenarioId': widget.scenarioId,
+        'selectedValue': widget.selectedValue,
       });
 
       if (!context.mounted) return;
@@ -773,7 +1171,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           backgroundColor: const Color(0xFF2ECC71),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           action: SnackBarAction(
             label: 'View Saved',
             textColor: Colors.white,
@@ -802,19 +1201,30 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           ),
           backgroundColor: Colors.red.shade400,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
   }
 
   String _monthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return months[month - 1];
   }
-
-
 }
 
 class _GlowActionButton extends StatefulWidget {
@@ -849,10 +1259,14 @@ class _GlowActionButtonState extends State<_GlowActionButton>
       duration: const Duration(milliseconds: 700),
     );
     _borderProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.65, curve: Curves.easeInOut)),
+      CurvedAnimation(
+          parent: _controller,
+          curve: const Interval(0.0, 0.65, curve: Curves.easeInOut)),
     );
     _glowRadius = Tween<double>(begin: 4.0, end: 20.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.65, curve: Curves.easeOut)),
+      CurvedAnimation(
+          parent: _controller,
+          curve: const Interval(0.0, 0.65, curve: Curves.easeOut)),
     );
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -911,7 +1325,10 @@ class _GlowActionButtonState extends State<_GlowActionButton>
                   Icon(widget.icon, color: Colors.white, size: 22),
                   const SizedBox(height: 4),
                   Text(widget.label,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
                 ],
               ),
             ),
@@ -936,7 +1353,8 @@ class _BorderDrawPainter extends CustomPainter {
   final Color color;
   final double radius;
 
-  _BorderDrawPainter({required this.progress, required this.color, this.radius = 30});
+  _BorderDrawPainter(
+      {required this.progress, required this.color, this.radius = 30});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -947,10 +1365,11 @@ class _BorderDrawPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final path = Path()..addRRect(RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Radius.circular(radius),
-    ));
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Radius.circular(radius),
+      ));
     final metrics = path.computeMetrics().first;
     canvas.drawPath(metrics.extractPath(0, metrics.length * progress), paint);
   }

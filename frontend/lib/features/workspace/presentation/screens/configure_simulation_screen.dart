@@ -43,6 +43,184 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
   bool get _isScenario3 => widget.scenario['scenarioNumber'] == 'Scenario 3';
   bool get _hasLockedConditions => _isScenario1 || _isScenario2 || _isScenario3;
 
+  String _buildScenarioId() {
+    if (_isScenario1) return 'S1';
+    if (_isScenario2) return 'S2';
+    if (_isScenario3) return 'S3';
+    return 'S1';
+  }
+
+  // Returns the value to match against the S3 JSON "conversion" or "selection" key.
+  // S1 → conversion double (e.g. 0.70)
+  // S2 → "rxn1-rxn2" string (e.g. "0.85-0.04")
+  // S3 → "rxn1-rxn2-rxn3" string (e.g. "0.75-0.03-0.01")
+  dynamic _buildSelectedValue() {
+    if (_isScenario1) return _selectedRxn1;
+    if (_isScenario2) {
+      final p = _rxnPairs[_selectedPairIndex];
+      return '${p[0]}-${p[1]}';
+    }
+    if (_isScenario3) {
+      final t = _rxnTriplets[_selectedTripletIndex];
+      return '${t[0]}-${t[1]}-${t[2]}';
+    }
+    return _selectedRxn1;
+  }
+
+  void _showError(BuildContext ctx, String msg) {
+    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(16),
+      content: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE74C3C).withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFE74C3C).withValues(alpha: 0.40),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline,
+                    color: Color(0xFFE74C3C), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(msg,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ));
+  }
+
+  // Populates _errorFields with all failing keys. Returns false if any errors.
+  bool _validatePeteInputs() {
+    _errorFields.clear();
+    double? parse(TextEditingController c) =>
+        double.tryParse(c.text.trim());
+
+    // Required fields — non-empty and > 0
+    final requiredPositive = <String, TextEditingController>{
+      'proj_duration': _projDurationCtrl,
+      'n_wells': _numWellsCtrl,
+      'depth': _depthCtrl,
+      'init_pressure': _initPressureCtrl,
+      'permeability': _permeabilityCtrl,
+      'thickness': _thicknessCtrl,
+      'res_radius': _reservoirRadiusCtrl,
+    };
+    for (final e in requiredPositive.entries) {
+      final v = parse(e.value);
+      if (e.value.text.trim().isEmpty || v == null || v <= 0) {
+        _errorFields.add(e.key);
+      }
+    }
+
+    // Porosity: required, 0 ≤ ϕ ≤ 1
+    final phi = parse(_porosityCtrl);
+    if (_porosityCtrl.text.trim().isEmpty || phi == null || phi < 0 || phi > 1) {
+      _errorFields.add('porosity');
+    }
+
+    // Section C: at least one of frac_pressure / frac_gradient
+    final hasFracP = _fracPressureCtrl.text.trim().isNotEmpty;
+    final hasFracG = _fracGradientCtrl.text.trim().isNotEmpty;
+    if (!hasFracP && !hasFracG) {
+      _errorFields.add('frac_pressure');
+      _errorFields.add('frac_gradient');
+    } else {
+      if (hasFracP) {
+        final v = parse(_fracPressureCtrl);
+        if (v == null || v <= 0) _errorFields.add('frac_pressure');
+      }
+      if (hasFracG) {
+        final v = parse(_fracGradientCtrl);
+        if (v == null || v <= 0) _errorFields.add('frac_gradient');
+      }
+    }
+
+    // Optional positives — validate only if filled
+    final optPositive = <String, TextEditingController>{
+      'safety_margin': _safetyMarginCtrl,
+      'co2_density': _co2DensityCtrl,
+      'co2_viscosity': _co2ViscosityCtrl,
+      'total_comp': _totalCompCtrl,
+      'well_radius': _wellboreRadiusCtrl,
+      'log_start_time': _logStartTimeCtrl,
+    };
+    for (final e in optPositive.entries) {
+      final txt = e.value.text.trim();
+      if (txt.isEmpty) continue;
+      final v = parse(e.value);
+      if (v == null || v <= 0) _errorFields.add(e.key);
+    }
+
+    if (_skinFactorCtrl.text.trim().isNotEmpty &&
+        double.tryParse(_skinFactorCtrl.text.trim()) == null) {
+      _errorFields.add('skin_factor');
+    }
+
+    if (_reservoirType == 'Closed' && _closedMultCtrl.text.trim().isNotEmpty) {
+      final v = parse(_closedMultCtrl);
+      if (v == null || v <= 0) _errorFields.add('closed_mult');
+    }
+
+    return _errorFields.isEmpty;
+  }
+
+  Map<String, dynamic> _buildReservoirInputs() {
+    double? parse(TextEditingController c) {
+      final t = c.text.trim();
+      return t.isEmpty ? null : double.tryParse(t);
+    }
+
+    return {
+      'project_duration': parse(_projDurationCtrl)!,
+      'n_wells': parse(_numWellsCtrl)!.toInt(),
+      'depth': parse(_depthCtrl)!,
+      'initial_pressure': parse(_initPressureCtrl)!,
+      'permeability': parse(_permeabilityCtrl)!,
+      'thickness': parse(_thicknessCtrl)!,
+      'porosity': parse(_porosityCtrl)!,
+      'radius': parse(_reservoirRadiusCtrl)!,
+      'reservoir_type': _reservoirType,
+      if (_fracPressureCtrl.text.trim().isNotEmpty)
+        'fracture_pressure': parse(_fracPressureCtrl)!,
+      if (_fracGradientCtrl.text.trim().isNotEmpty)
+        'fracture_gradient': parse(_fracGradientCtrl)!,
+      if (_safetyMarginCtrl.text.trim().isNotEmpty)
+        'safety_margin': parse(_safetyMarginCtrl)!,
+      if (_co2DensityCtrl.text.trim().isNotEmpty)
+        'co2_density': parse(_co2DensityCtrl)!,
+      if (_co2ViscosityCtrl.text.trim().isNotEmpty)
+        'co2_viscosity': parse(_co2ViscosityCtrl)!,
+      if (_totalCompCtrl.text.trim().isNotEmpty)
+        'compressibility': parse(_totalCompCtrl)!,
+      if (_wellboreRadiusCtrl.text.trim().isNotEmpty)
+        'well_radius': parse(_wellboreRadiusCtrl)!,
+      if (_skinFactorCtrl.text.trim().isNotEmpty)
+        'skin': parse(_skinFactorCtrl)!,
+      if (_logStartTimeCtrl.text.trim().isNotEmpty)
+        'log_start_time': parse(_logStartTimeCtrl)!,
+      if (_reservoirType == 'Closed' && _closedMultCtrl.text.trim().isNotEmpty)
+        'closed_multiplier': parse(_closedMultCtrl)!,
+    };
+  }
+
   // Scenario 2 — allowed Rxn1/Rxn2 pairs (in order from spec)
   static const List<List<double>> _rxnPairs = [
     [0.90, 0.04],
@@ -143,6 +321,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
   final _closedMultCtrl = TextEditingController();
   final _logStartTimeCtrl = TextEditingController();
 
+  final Set<String> _errorFields = {};
+
+  void _clearFieldError(String key) {
+    if (_errorFields.contains(key)) setState(() => _errorFields.remove(key));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -161,6 +345,35 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     _skinFactorCtrl.text = '0';
     _closedMultCtrl.text = '3';
     _logStartTimeCtrl.text = '1';
+
+    // Clear error highlights as user edits each field
+    final fieldListeners = <TextEditingController, String>{
+      _projDurationCtrl: 'proj_duration',
+      _numWellsCtrl: 'n_wells',
+      _depthCtrl: 'depth',
+      _initPressureCtrl: 'init_pressure',
+      _permeabilityCtrl: 'permeability',
+      _thicknessCtrl: 'thickness',
+      _porosityCtrl: 'porosity',
+      _reservoirRadiusCtrl: 'res_radius',
+      _fracPressureCtrl: 'frac_pressure',
+      _fracGradientCtrl: 'frac_gradient',
+      _safetyMarginCtrl: 'safety_margin',
+      _co2DensityCtrl: 'co2_density',
+      _co2ViscosityCtrl: 'co2_viscosity',
+      _totalCompCtrl: 'total_comp',
+      _wellboreRadiusCtrl: 'well_radius',
+      _skinFactorCtrl: 'skin_factor',
+      _closedMultCtrl: 'closed_mult',
+      _logStartTimeCtrl: 'log_start_time',
+    };
+    for (final e in fieldListeners.entries) {
+      final key = e.value;
+      e.key.addListener(() => _clearFieldError(key));
+    }
+    // frac either/or: editing either one clears both highlights
+    _fracPressureCtrl.addListener(() => _clearFieldError('frac_gradient'));
+    _fracGradientCtrl.addListener(() => _clearFieldError('frac_pressure'));
   }
 
   @override
@@ -421,14 +634,17 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                                           .onUserInteraction,
                                                   validator: (val) {
                                                     if (val == null ||
-                                                        val.isEmpty)
+                                                        val.isEmpty) {
                                                       return 'Pressure is required';
+                                                    }
                                                     final p =
                                                         double.tryParse(val);
-                                                    if (p == null)
+                                                    if (p == null) {
                                                       return 'Enter a valid number';
-                                                    if (p < 0.5 || p > 10)
+                                                    }
+                                                    if (p < 0.5 || p > 10) {
                                                       return 'Range: 0.5 – 10 bar';
+                                                    }
                                                     return null;
                                                   },
                                                   decoration: InputDecoration(
@@ -607,7 +823,8 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                           ),
                                           _hasLockedConditions
                                               ? _readOnlyFraction(
-                                                  (_isScenario3 && r['rxn'] == 5)
+                                                  (_isScenario3 &&
+                                                          r['rxn'] == 5)
                                                       ? 0.02
                                                       : r['value'] as double,
                                                   accentColor)
@@ -682,11 +899,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                                           final parsed =
                                                               double.tryParse(
                                                                   val);
-                                                          if (parsed != null)
+                                                          if (parsed != null) {
                                                             setState(() =>
                                                                 _reactions[i][
                                                                         'value'] =
                                                                     parsed);
+                                                          }
                                                         },
                                                       ),
                                                     ),
@@ -758,13 +976,15 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     label: 'Project duration (T_proj)',
                                     unit: 'years',
                                     controller: _projDurationCtrl,
-                                    accentColor: accentColor),
+                                    accentColor: accentColor,
+                                    fieldKey: 'proj_duration'),
                                 const SizedBox(height: 14),
                                 _peteField(
                                     label: 'Number of wells (N_w)',
                                     unit: '–',
                                     controller: _numWellsCtrl,
                                     accentColor: accentColor,
+                                    fieldKey: 'n_wells',
                                     keyboardType: TextInputType.number),
                               ],
                             ),
@@ -785,14 +1005,16 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             label: 'Depth (D)',
                                             unit: 'm',
                                             controller: _depthCtrl,
-                                            accentColor: accentColor)),
+                                            accentColor: accentColor,
+                                            fieldKey: 'depth')),
                                     const SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Initial pressure (P_i)',
                                             unit: 'MPa',
                                             controller: _initPressureCtrl,
-                                            accentColor: accentColor)),
+                                            accentColor: accentColor,
+                                            fieldKey: 'init_pressure')),
                                   ],
                                 ),
                                 const SizedBox(height: 14),
@@ -803,14 +1025,16 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             label: 'Permeability (k)',
                                             unit: 'mD',
                                             controller: _permeabilityCtrl,
-                                            accentColor: accentColor)),
+                                            accentColor: accentColor,
+                                            fieldKey: 'permeability')),
                                     const SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Thickness (h)',
                                             unit: 'm',
                                             controller: _thicknessCtrl,
-                                            accentColor: accentColor)),
+                                            accentColor: accentColor,
+                                            fieldKey: 'thickness')),
                                   ],
                                 ),
                                 const SizedBox(height: 14),
@@ -822,6 +1046,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: '–',
                                             controller: _porosityCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'porosity',
                                             hint: '0 – 1')),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -829,7 +1054,8 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             label: 'Reservoir radius (r_e)',
                                             unit: 'm',
                                             controller: _reservoirRadiusCtrl,
-                                            accentColor: accentColor)),
+                                            accentColor: accentColor,
+                                            fieldKey: 'res_radius')),
                                   ],
                                 ),
                                 const SizedBox(height: 14),
@@ -838,8 +1064,8 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                   children: [
                                     Row(
                                       children: [
-                                        Text('Reservoir type',
-                                            style: const TextStyle(
+                                        const Text('Reservoir type',
+                                            style: TextStyle(
                                                 fontSize: 12,
                                                 color: AppColors.textLight)),
                                         const Spacer(),
@@ -925,6 +1151,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     unit: 'MPa',
                                     controller: _fracPressureCtrl,
                                     accentColor: accentColor,
+                                    fieldKey: 'frac_pressure',
                                     isRequired: false,
                                     badgeLabel: 'Either / Or'),
                                 const SizedBox(height: 14),
@@ -933,6 +1160,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     unit: 'MPa/m',
                                     controller: _fracGradientCtrl,
                                     accentColor: accentColor,
+                                    fieldKey: 'frac_gradient',
                                     isRequired: false,
                                     badgeLabel: 'Either / Or'),
                                 const SizedBox(height: 14),
@@ -941,6 +1169,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     unit: 'MPa',
                                     controller: _safetyMarginCtrl,
                                     accentColor: accentColor,
+                                    fieldKey: 'safety_margin',
                                     isRequired: false,
                                     badgeLabel: 'Optional',
                                     hint: 'default: 1.5',
@@ -955,11 +1184,11 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                           // D. Advanced Inputs
                           _peteSubHeader('D', 'Advanced Inputs', accentColor),
                           const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
                             child: Text(
                                 'All fields optional — leave blank to use defaults',
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 11, color: AppColors.textLight)),
                           ),
                           _sectionCard(
@@ -973,6 +1202,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: 'kg/m³',
                                             controller: _co2DensityCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'co2_density',
                                             isRequired: false,
                                             badgeLabel: 'Optional',
                                             hint: 'default: 700',
@@ -985,6 +1215,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: 'cP',
                                             controller: _co2ViscosityCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'co2_viscosity',
                                             isRequired: false,
                                             badgeLabel: 'Optional',
                                             hint: 'default: 0.05',
@@ -1002,6 +1233,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: '1/MPa',
                                             controller: _totalCompCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'total_comp',
                                             isRequired: false,
                                             badgeLabel: 'Optional',
                                             hint: 'default: 0.0001',
@@ -1014,6 +1246,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: 'm',
                                             controller: _wellboreRadiusCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'well_radius',
                                             isRequired: false,
                                             badgeLabel: 'Optional',
                                             hint: 'default: 0.1',
@@ -1030,6 +1263,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: '–',
                                             controller: _skinFactorCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'skin_factor',
                                             isRequired: false,
                                             badgeLabel: 'Optional',
                                             hint: 'default: 0',
@@ -1042,6 +1276,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: 'days',
                                             controller: _logStartTimeCtrl,
                                             accentColor: accentColor,
+                                            fieldKey: 'log_start_time',
                                             isRequired: false,
                                             badgeLabel: 'Optional',
                                             hint: 'default: 1',
@@ -1056,6 +1291,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                       unit: '–',
                                       controller: _closedMultCtrl,
                                       accentColor: accentColor,
+                                      fieldKey: 'closed_mult',
                                       isRequired: false,
                                       badgeLabel: 'Optional',
                                       hint: 'default: 3',
@@ -1120,6 +1356,15 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                 return;
                               }
                             }
+                            if (_hasReservoirInfo) {
+                              final valid = _validatePeteInputs();
+                              setState(() {});
+                              if (!valid) {
+                                _showError(context,
+                                    'Please fill in all highlighted fields correctly.');
+                                return;
+                              }
+                            }
                             Navigator.push(
                               context,
                               PageRouteBuilder(
@@ -1132,6 +1377,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                   pressure: _hasLockedConditions
                                       ? '1.5'
                                       : _pressureController.text,
+                                  scenarioId: _buildScenarioId(),
+                                  selectedValue: _buildSelectedValue(),
+                                  useReservoir: _hasReservoirInfo,
+                                  reservoirInputs: _hasReservoirInfo
+                                      ? _buildReservoirInputs()
+                                      : null,
                                 ),
                                 transitionsBuilder: (_, anim, __, child) =>
                                     FadeTransition(opacity: anim, child: child),
@@ -1772,6 +2023,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     required String unit,
     required TextEditingController controller,
     required Color accentColor,
+    String? fieldKey,
     bool isRequired = true,
     String badgeLabel = 'Required',
     String? hint,
@@ -1780,6 +2032,8 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
         const TextInputType.numberWithOptions(decimal: true, signed: true),
   }) {
     final hintText = hint ?? (unit != '–' ? unit : 'Enter value');
+    final hasError = fieldKey != null && _errorFields.contains(fieldKey);
+    const errorRed = Color(0xFFE74C3C);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1787,10 +2041,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
           children: [
             Expanded(
               child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textLight)),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: hasError ? errorRed : AppColors.textLight)),
             ),
-            _peteBadge(badgeLabel, accentColor, isRequired: isRequired),
+            _peteBadge(badgeLabel, hasError ? errorRed : accentColor,
+                isRequired: isRequired),
           ],
         ),
         const SizedBox(height: 7),
@@ -1803,17 +2059,21 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                 gradient: LinearGradient(
                   colors: [
                     Colors.white.withValues(alpha: 0.60),
-                    accentColor.withValues(alpha: 0.07)
+                    (hasError ? errorRed : accentColor).withValues(alpha: 0.07)
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.6), width: 1.2),
+                    color: hasError
+                        ? errorRed.withValues(alpha: 0.65)
+                        : Colors.white.withValues(alpha: 0.6),
+                    width: hasError ? 1.5 : 1.2),
                 boxShadow: [
                   BoxShadow(
-                      color: accentColor.withValues(alpha: 0.09),
+                      color: (hasError ? errorRed : accentColor)
+                          .withValues(alpha: 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 3))
                 ],
@@ -1824,7 +2084,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: accentColor),
+                    color: hasError ? errorRed : accentColor),
                 decoration: InputDecoration(
                   hintText: hintText,
                   hintStyle: TextStyle(

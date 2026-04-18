@@ -46,3 +46,7 @@ app.*.map.json
 
 # AWS Amplify — contains real Cognito credentials, never commit
 lib/amplifyconfiguration.dart
+
+# Environment variables — API keys/URLs, never commit
+.env
+.env.*

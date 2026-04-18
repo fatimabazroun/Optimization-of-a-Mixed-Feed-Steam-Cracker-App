@@ -219,6 +219,8 @@ class _SavedScreenState extends State<SavedScreen> {
           scenario: scenarioData,
           temperature: s['temperature'] as String,
           pressure: s['pressure'] as String,
+          scenarioId: s['scenarioId'] as String? ?? 'S1',
+          selectedValue: s['selectedValue'] ?? '',
         ),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
