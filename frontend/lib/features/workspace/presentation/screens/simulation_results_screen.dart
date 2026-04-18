@@ -26,7 +26,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   late AnimationController _fadeController;
   late Animation<double> _fade;
   int _selectedTab = 0;
-  final List<String> _tabs = ['Overview', 'Performance', 'Trends'];
+  final List<String> _tabs = ['Overview', 'Performance', 'Trends', 'Recommendation'];
 
   // Determine status and KPI values based on temp & pressure
   late final Map<String, dynamic> _results;
@@ -47,94 +47,53 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     final temp = double.tryParse(widget.temperature) ?? 850;
     final pressure = double.tryParse(widget.pressure) ?? 1.5;
 
-    // Temperature classification
-    String tempStatus;
-    String tempMessage;
-    Color tempColor;
-    if (temp >= 650 && temp <= 720) {
-      tempStatus = 'No Cracking';
-      tempMessage = 'Ethane remains mostly unreacted.';
-      tempColor = Colors.red;
-    } else if (temp >= 750 && temp <= 800) {
-      tempStatus = 'Initial Cracking';
-      tempMessage = 'Small amounts of ethylene and hydrogen forming.';
-      tempColor = Colors.orange;
-    } else if (temp >= 820 && temp <= 880) {
-      tempStatus = 'Optimal';
-      tempMessage = 'High ethylene production and stable reactor operation.';
-      tempColor = const Color(0xFF2ECC71);
-    } else if (temp >= 900 && temp <= 1000) {
-      tempStatus = 'Over-Cracking';
-      tempMessage = 'Secondary reactions increasing methane, hydrogen, acetylene.';
-      tempColor = Colors.orange;
-    } else {
-      tempStatus = 'Out of Range';
-      tempMessage = 'Temperature outside known operating scenarios.';
-      tempColor = Colors.red;
-    }
-
-    // Pressure classification
-    String pressureStatus;
-    String pressureMessage;
-    Color pressureColor;
-    if (pressure >= 0.5 && pressure <= 1.5) {
-      pressureStatus = 'Optimal';
-      pressureMessage = 'Highest ethylene yield expected.';
-      pressureColor = const Color(0xFF2ECC71);
-    } else if (pressure >= 2 && pressure <= 4) {
-      pressureStatus = 'Warning';
-      pressureMessage = 'Cracking efficiency decreases; more recombination reactions.';
-      pressureColor = Colors.orange;
-    } else if (pressure >= 5 && pressure <= 10) {
-      pressureStatus = 'Suppressed';
-      pressureMessage = 'Cracking suppressed; heavier hydrocarbons favored.';
-      pressureColor = Colors.red;
-    } else {
-      pressureStatus = 'Out of Range';
-      pressureMessage = 'Pressure outside known operating scenarios.';
-      pressureColor = Colors.red;
-    }
-
-    // Overall status
-    final hasWarning = tempStatus != 'Optimal' || pressureStatus != 'Optimal';
-    final hasCritical = tempStatus == 'No Cracking' || pressureStatus == 'Suppressed';
-    String overallStatus;
-    Color overallColor;
-    IconData overallIcon;
-    if (hasCritical) {
-      overallStatus = 'Critical Conditions';
-      overallColor = Colors.red;
-      overallIcon = Icons.cancel_outlined;
-    } else if (hasWarning) {
-      overallStatus = 'Operating With Warnings';
-      overallColor = Colors.orange;
-      overallIcon = Icons.warning_amber_outlined;
-    } else {
-      overallStatus = 'Optimal Operation';
-      overallColor = const Color(0xFF2ECC71);
-      overallIcon = Icons.check_circle_outline;
-    }
-
-    // Estimated KPIs (simplified model)
+    // Estimated cracking KPIs
     final ethyleneYield = temp >= 820 && temp <= 880 ? 32.5 : temp >= 900 ? 24.1 : 15.3;
-    final co2Emissions = pressure <= 1.5 ? 388.0 : pressure <= 4 ? 432.0 : 510.0;
-    final fuelDuty = temp >= 820 ? 12.4 : 8.9;
-    final h2Recovery = temp >= 820 && temp <= 880 ? 78.5 : 61.2;
+    final co2Emissions  = pressure <= 1.5 ? 388.0 : pressure <= 4 ? 432.0 : 510.0;
+    final fuelDuty      = temp >= 820 ? 12.4 : 8.9;
+    final h2Recovery    = temp >= 820 && temp <= 880 ? 78.5 : 61.2;
+
+    // Cracking overview KPIs (placeholder — replace with backend values)
+    final furnaceReduction = temp >= 820 && temp <= 880 ? 18.3 : temp >= 900 ? 12.7 : 7.4; // %
+    final cost             = pressure <= 1.5 ? 142.0 : pressure <= 4 ? 167.0 : 198.0;       // $/tonne
+    final hydrogenPurity   = temp >= 820 && temp <= 880 ? 94.2 : temp >= 900 ? 88.6 : 79.1; // %
+
+    // ── PETE outputs (placeholder — replace with backend values) ──
+    const double maxInjectionTime    = 18.5;   // years
+    const double pressureAtEnd       = 28.4;   // MPa
+    const double maxSustainableRate  = 1850.0; // kg/hr
+    const double plumeRadius         = 2340.0; // m
+
+    // Feasibility classification
+    // Feasible: injection time covers full project duration (assume 20 yr default)
+    // Conditional: some capacity but not full duration
+    // Infeasible: cannot safely inject
+    const String feasibility = 'Feasible'; // swap with backend result
+    const Color  feasibilityColor = Color(0xFF2ECC71);
+    const IconData feasibilityIcon = Icons.check_circle_outline;
+    const String feasibilityMessage = 'Reservoir can sustain the required CO₂ rate for the full project duration without exceeding pressure limits.';
 
     return {
-      'overallStatus': overallStatus,
-      'overallColor': overallColor,
-      'overallIcon': overallIcon,
-      'tempStatus': tempStatus,
-      'tempMessage': tempMessage,
-      'tempColor': tempColor,
-      'pressureStatus': pressureStatus,
-      'pressureMessage': pressureMessage,
-      'pressureColor': pressureColor,
-      'ethyleneYield': ethyleneYield,
-      'co2Emissions': co2Emissions,
-      'fuelDuty': fuelDuty,
-      'h2Recovery': h2Recovery,
+      'overallStatus':       feasibility,
+      'overallColor':        feasibilityColor,
+      'overallIcon':         feasibilityIcon,
+      // PETE
+      'feasibility':         feasibility,
+      'feasibilityColor':    feasibilityColor,
+      'feasibilityIcon':     feasibilityIcon,
+      'feasibilityMessage':  feasibilityMessage,
+      'maxInjectionTime':    maxInjectionTime,
+      'pressureAtEnd':       pressureAtEnd,
+      'maxSustainableRate':  maxSustainableRate,
+      'plumeRadius':         plumeRadius,
+      // Cracking KPIs
+      'ethyleneYield':    ethyleneYield,
+      'co2Emissions':     co2Emissions,
+      'fuelDuty':         fuelDuty,
+      'h2Recovery':       h2Recovery,
+      'furnaceReduction': furnaceReduction,
+      'cost':             cost,
+      'hydrogenPurity':   hydrogenPurity,
     };
   }
 
@@ -147,7 +106,6 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   @override
   Widget build(BuildContext context) {
     final Color accentColor = widget.scenario['color'] as Color;
-    final overallColor = _results['overallColor'] as Color;
 
     return Scaffold(
       body: Container(
@@ -179,43 +137,6 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Simulation Results', style: AppTextStyles.heading1),
-                        const SizedBox(height: 16),
-
-                        // Status banner
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: overallColor.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: overallColor.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(_results['overallIcon'] as IconData,
-                                  color: overallColor, size: 22),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(_results['overallStatus'],
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: overallColor,
-                                      )),
-                                  Text(
-                                    'T: ${widget.temperature}°C  •  P: ${widget.pressure} bar',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textLight,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
                         const SizedBox(height: 20),
 
                         // Tabs
@@ -225,15 +146,16 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Row(
-                            children: _tabs.asMap().entries.map((e) {
-                              final selected = _selectedTab == e.key;
-                              return Expanded(
-                                child: GestureDetector(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _tabs.asMap().entries.map((e) {
+                                final selected = _selectedTab == e.key;
+                                return GestureDetector(
                                   onTap: () => setState(() => _selectedTab = e.key),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                                     decoration: BoxDecoration(
                                       gradient: selected
                                           ? LinearGradient(
@@ -245,16 +167,15 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(e.value,
-                                        textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
                                           color: selected ? Colors.white : AppColors.textLight,
                                         )),
                                   ),
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
 
@@ -264,6 +185,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                         if (_selectedTab == 0) _buildOverview(),
                         if (_selectedTab == 1) _buildPerformance(accentColor),
                         if (_selectedTab == 2) _buildTrends(accentColor),
+                        if (_selectedTab == 3) _buildRecommendation(accentColor),
 
                         const SizedBox(height: 24),
 
@@ -292,69 +214,362 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   }
 
   Widget _buildOverview() {
+    final feasColor  = _results['feasibilityColor'] as Color;
+    final feasIcon   = _results['feasibilityIcon'] as IconData;
+    final feasLabel  = _results['feasibility'] as String;
+    final feasMsg    = _results['feasibilityMessage'] as String;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _kpiCard(
-          label: 'OUTLET TEMPERATURE',
-          value: widget.temperature,
-          unit: '°C',
-          status: _results['tempStatus'],
-          message: _results['tempMessage'],
-          color: _results['tempColor'],
+        // ── 1. Feasibility Result (most important) ──
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: feasColor.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: feasColor.withValues(alpha: 0.35), width: 1.5),
+            boxShadow: [BoxShadow(color: feasColor.withValues(alpha: 0.10), blurRadius: 14, offset: const Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: feasColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('MOST IMPORTANT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.textLight, letterSpacing: 0.5)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(feasIcon, color: feasColor, size: 28),
+                  const SizedBox(width: 12),
+                  Text('Feasibility Result',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textLight)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(feasLabel,
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: feasColor)),
+              const SizedBox(height: 8),
+              Text(feasMsg,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.5)),
+            ],
+          ),
         ),
+
         const SizedBox(height: 14),
-        _kpiCard(
-          label: 'OUTLET PRESSURE',
-          value: widget.pressure,
-          unit: 'bar',
-          status: _results['pressureStatus'],
-          message: _results['pressureMessage'],
-          color: _results['pressureColor'],
+
+        // ── 2–5. Metric cards in 2×2 grid ──
+        Row(
+          children: [
+            Expanded(child: _peteMetricCard(
+              label: 'Max Safe\nInjection Time',
+              value: (_results['maxInjectionTime'] as double).toStringAsFixed(1),
+              unit: 'years',
+              icon: Icons.timer_outlined,
+              description: 'How long we can inject before reaching the pressure limit.',
+              color: AppColors.cyan,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _peteMetricCard(
+              label: 'Pressure at\nProject End',
+              value: (_results['pressureAtEnd'] as double).toStringAsFixed(1),
+              unit: 'MPa',
+              icon: Icons.compress_outlined,
+              description: 'Reservoir pressure at the end of the full project duration.',
+              color: AppColors.purple,
+            )),
+          ],
         ),
-        const SizedBox(height: 14),
-        _kpiCard(
-          label: 'CO₂ EMISSIONS',
-          value: _results['co2Emissions'].toStringAsFixed(0),
-          unit: 'kg/h',
-          status: _results['pressureStatus'] == 'Optimal' ? 'Within Limits' : 'Warning',
-          message: 'CO₂ output based on operating pressure.',
-          color: _results['pressureColor'],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _peteMetricCard(
+              label: 'Max Sustainable\nInjection Rate',
+              value: (_results['maxSustainableRate'] as double).toStringAsFixed(0),
+              unit: 'kg/hr',
+              icon: Icons.speed_outlined,
+              description: 'Maximum CO₂ rate the reservoir can handle safely.',
+              color: AppColors.midTone,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _peteMetricCard(
+              label: 'Plume\nRadius',
+              value: (_results['plumeRadius'] as double).toStringAsFixed(0),
+              unit: 'm',
+              icon: Icons.radar_outlined,
+              description: 'How large the CO₂ plume becomes by end of project.',
+              color: const Color(0xFF2ECC71),
+            )),
+          ],
+        ),
+
+        const SizedBox(height: 20),
+        const Text('Cracking Performance',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(child: _peteMetricCard(
+              label: 'Ethylene\nYield',
+              value: (_results['ethyleneYield'] as double).toStringAsFixed(1),
+              unit: '%',
+              icon: Icons.bubble_chart_outlined,
+              description: 'Mass fraction of ethylene produced relative to total feed.',
+              color: AppColors.cyan,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _peteMetricCard(
+              label: 'Furnace\nReduction',
+              value: (_results['furnaceReduction'] as double).toStringAsFixed(1),
+              unit: '%',
+              icon: Icons.local_fire_department_outlined,
+              description: 'Reduction in furnace fuel duty vs baseline operation.',
+              color: Colors.orange,
+            )),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _peteMetricCard(
+              label: 'Operating\nCost',
+              value: (_results['cost'] as double).toStringAsFixed(0),
+              unit: '\$/t',
+              icon: Icons.attach_money_outlined,
+              description: 'Estimated operating cost per tonne of ethylene produced.',
+              color: AppColors.purple,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _peteMetricCard(
+              label: 'Hydrogen\nPurity',
+              value: (_results['hydrogenPurity'] as double).toStringAsFixed(1),
+              unit: '%',
+              icon: Icons.science_outlined,
+              description: 'Purity of recovered hydrogen as a by-product stream.',
+              color: AppColors.midTone,
+            )),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildPerformance(Color accentColor) {
+  Widget _peteMetricCard({
+    required String label,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required String description,
+    required Color color,
+  }) {
     return Container(
-      height: 220,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.07), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
+                child: Icon(icon, color: color, size: 17),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textLight, height: 1.4))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: color)),
+              const SizedBox(width: 4),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(unit, style: const TextStyle(fontSize: 12, color: AppColors.textMedium)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(description, style: const TextStyle(fontSize: 10, color: AppColors.textLight, height: 1.4)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerformance(Color accentColor) {
+    return Column(
+      children: [
+        _chartPlaceholder(
+          title: 'Pressure vs Time',
+          description: 'Shows how reservoir pressure increases over time and where it hits the allowable limit.',
+          icon: Icons.show_chart_rounded,
+          accentColor: accentColor,
+        ),
+        const SizedBox(height: 16),
+        _chartPlaceholder(
+          title: 'Plume Radius vs Time',
+          description: 'Shows how the CO₂ plume spreads in the reservoir over the project duration.',
+          icon: Icons.radar_outlined,
+          accentColor: AppColors.cyan,
+        ),
+      ],
+    );
+  }
+
+  Widget _chartPlaceholder({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color accentColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryBlue.withOpacity(0.07),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.07), blurRadius: 16, offset: const Offset(0, 4))],
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.bar_chart_rounded, size: 48, color: accentColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text('Performance Charts', style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textMedium,
-          )),
-          const SizedBox(height: 8),
-          const Text('Coming soon', style: TextStyle(
-            fontSize: 13,
-            color: AppColors.textLight,
-          )),
+          Row(
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: accentColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 130,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accentColor.withValues(alpha: 0.12)),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.insert_chart_outlined_rounded, size: 36, color: accentColor.withValues(alpha: 0.3)),
+                  const SizedBox(height: 8),
+                  Text('Chart coming soon', style: TextStyle(fontSize: 12, color: accentColor.withValues(alpha: 0.5))),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(description, style: const TextStyle(fontSize: 11, color: AppColors.textLight, height: 1.5)),
         ],
       ),
+    );
+  }
+
+  Widget _buildRecommendation(Color accentColor) {
+    final feasibility = _results['feasibility'] as String;
+    final feasColor   = _results['feasibilityColor'] as Color;
+
+    final List<Map<String, dynamic>> items;
+    if (feasibility == 'Feasible') {
+      items = [
+        {'icon': Icons.check_circle_outline, 'color': const Color(0xFF2ECC71), 'title': 'Proceed with injection', 'body': 'The reservoir can sustain the required CO₂ rate for the full project duration. No adjustments needed.'},
+        {'icon': Icons.monitor_heart_outlined, 'color': AppColors.cyan, 'title': 'Monitor reservoir pressure', 'body': 'Although feasible, continuous pressure monitoring is recommended to detect any unexpected behaviour early.'},
+        {'icon': Icons.water_drop_outlined, 'color': AppColors.midTone, 'title': 'Track plume migration', 'body': 'Periodic seismic surveys are advised to confirm the CO₂ plume stays within the modelled radius.'},
+      ];
+    } else if (feasibility == 'Conditional') {
+      items = [
+        {'icon': Icons.warning_amber_outlined, 'color': Colors.orange, 'title': 'Reduce injection rate', 'body': 'The reservoir can handle some injection but not for the full project duration. Consider reducing the CO₂ rate or phasing injection.'},
+        {'icon': Icons.hourglass_top_outlined, 'color': Colors.orange, 'title': 'Shorten project duration', 'body': 'Adjusting the project timeline to match the maximum safe injection time can make this scenario viable.'},
+        {'icon': Icons.add_location_alt_outlined, 'color': AppColors.cyan, 'title': 'Consider additional wells', 'body': 'Distributing the CO₂ load across more injection wells can extend the safe injection window.'},
+      ];
+    } else {
+      items = [
+        {'icon': Icons.cancel_outlined, 'color': Colors.red, 'title': 'Injection not recommended', 'body': 'The reservoir cannot safely handle the required CO₂ rate. Exceeding pressure limits risks fracturing and containment failure.'},
+        {'icon': Icons.search_outlined, 'color': AppColors.purple, 'title': 'Re-evaluate reservoir selection', 'body': 'Consider reservoirs with higher permeability, greater thickness, or lower initial pressure for safer storage.'},
+        {'icon': Icons.tune_outlined, 'color': AppColors.midTone, 'title': 'Revisit input parameters', 'body': 'Review CO₂ rate, number of wells, and fracture pressure estimates — small adjustments may shift the feasibility outcome.'},
+      ];
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Feasibility summary chip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: feasColor.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: feasColor.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(_results['feasibilityIcon'] as IconData, color: feasColor, size: 18),
+              const SizedBox(width: 10),
+              Text('Result: $feasibility',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: feasColor)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...items.map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 3))],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: (item['color'] as Color).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(item['icon'] as IconData, color: item['color'] as Color, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item['title'] as String,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+                    const SizedBox(height: 4),
+                    Text(item['body'] as String,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        )),
+      ],
     );
   }
 
@@ -365,7 +580,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: AppColors.primaryBlue.withOpacity(0.07), blurRadius: 16, offset: const Offset(0, 4)),
+          BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.07), blurRadius: 16, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -404,7 +619,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
             value: clamped,
-            backgroundColor: color.withOpacity(0.1),
+            backgroundColor: color.withValues(alpha: 0.1),
             valueColor: AlwaysStoppedAnimation(color),
             minHeight: 8,
           ),
@@ -413,78 +628,6 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
   }
 
-  Widget _kpiCard({
-    required String label,
-    required String value,
-    required String unit,
-    required String status,
-    required String message,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(color: color.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: AppColors.textLight, letterSpacing: 0.5)),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(value,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.darkBase,
-                  )),
-              const SizedBox(width: 4),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(unit,
-                    style: const TextStyle(fontSize: 14, color: AppColors.textMedium)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                color == const Color(0xFF2ECC71)
-                    ? Icons.check_circle_outline
-                    : Icons.warning_amber_outlined,
-                color: color,
-                size: 15,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(message,
-                    style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: 0.7,
-              backgroundColor: color.withOpacity(0.1),
-              valueColor: AlwaysStoppedAnimation(color.withOpacity(0.5)),
-              minHeight: 4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
 
 
@@ -517,10 +660,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         temperature: widget.temperature,
         pressure: widget.pressure,
         overallStatus: _results['overallStatus'] as String,
-        tempStatus: _results['tempStatus'] as String,
-        tempMessage: _results['tempMessage'] as String,
-        pressureStatus: _results['pressureStatus'] as String,
-        pressureMessage: _results['pressureMessage'] as String,
+        tempStatus: _results['feasibility'] as String,
+        tempMessage: _results['feasibilityMessage'] as String,
+        pressureStatus: _results['feasibility'] as String,
+        pressureMessage: _results['feasibilityMessage'] as String,
         ethyleneYield: _results['ethyleneYield'] as double,
         co2Emissions: _results['co2Emissions'] as double,
         fuelDuty: _results['fuelDuty'] as double,
@@ -756,7 +899,7 @@ class _GlowActionButtonState extends State<_GlowActionButton>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: widget.accentColor.withOpacity(0.45),
+                    color: widget.accentColor.withValues(alpha: 0.45),
                     blurRadius: _glowRadius.value,
                     spreadRadius: _glowRadius.value * 0.15,
                     offset: const Offset(0, 3),
@@ -799,7 +942,7 @@ class _BorderDrawPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (progress == 0) return;
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.9)
+      ..color = Colors.white.withValues(alpha: 0.9)
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
