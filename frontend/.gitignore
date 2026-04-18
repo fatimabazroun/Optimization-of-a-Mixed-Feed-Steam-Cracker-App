@@ -44,6 +44,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# iOS/macOS build artifacts
+ios/build/
+macos/build/
+
 # AWS Amplify — contains real Cognito credentials, never commit
 lib/amplifyconfiguration.dart
 

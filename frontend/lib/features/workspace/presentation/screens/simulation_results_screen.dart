@@ -110,6 +110,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       feasIcon = Icons.hourglass_empty_outlined;
     }
 
+    final ise = data['ise'] as Map<String, dynamic>?;
+    final iseKpis = data['ise_calculated_kpis'] as Map<String, dynamic>?;
+
     return {
       'ethyleneYield': ethyleneYield,
       'furnaceReduction': furnaceReduction,
@@ -129,6 +132,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           (res?['max_sustainable_rate_kg_hr'] as num? ?? 0).toDouble(),
       'plumeRadius':
           (res?['estimated_plume_radius_m'] as num? ?? 0).toDouble(),
+      'iseRecommendation': ise?['recommendation'] as String? ?? '',
+      'ethyleneKgHr': (iseKpis?['ethylene_kg_hr'] as num? ?? 0).toDouble(),
+      'hydrogenKgHr': (iseKpis?['hydrogen_kg_hr'] as num? ?? 0).toDouble(),
+      'co2eKgHr': (iseKpis?['co2e_kg_hr'] as num? ?? 0).toDouble(),
     };
   }
 
@@ -793,7 +800,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   Widget _buildRecommendation(Color accentColor) {
     final r = _results!;
     final feasibility = r['feasibility'] as String;
-    final feasColor = r['feasibilityColor'] as Color;
+    final iseRec = (r['iseRecommendation'] as String?) ?? '';
 
     final List<Map<String, dynamic>> items;
     if (feasibility == 'Feasible') {
@@ -873,29 +880,57 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Feasibility summary chip
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: feasColor.withValues(alpha: 0.09),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: feasColor.withValues(alpha: 0.25)),
+        // ISE optimization recommendation
+        if (iseRec.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accentColor.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.lightbulb_outline,
+                      color: accentColor, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Optimization Recommendation',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.darkBase)),
+                      const SizedBox(height: 6),
+                      Text(iseRec,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textMedium,
+                              height: 1.5)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Row(
-            children: [
-              Icon(r['feasibilityIcon'] as IconData,
-                  color: feasColor, size: 18),
-              const SizedBox(width: 10),
-              Text('Result: $feasibility',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: feasColor)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...items.map((item) => Container(
+          const SizedBox(height: 16),
+        ],
+
+        // Reservoir recommendations (only when reservoir was run)
+        if (widget.useReservoir) ...[
+          ...items.map((item) => Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -943,75 +978,115 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                 ],
               ),
             )),
+        ],
       ],
     );
   }
 
   Widget _buildTrends(Color accentColor) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.primaryBlue.withValues(alpha: 0.07),
-              blurRadius: 16,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Trend Analysis',
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.darkBase)),
-          const SizedBox(height: 16),
-          _trendRow('Ethylene Yield',
-              (_results!['ethyleneYield'] as double) / 100, accentColor),
-          const SizedBox(height: 12),
-          _trendRow('H₂ Purity',
-              (_results!['hydrogenPurity'] as double) / 100, AppColors.cyan),
-          const SizedBox(height: 12),
-          _trendRow('Furnace Reduction',
-              (_results!['furnaceReduction'] as double) / 100, Colors.orange),
-          const SizedBox(height: 12),
-          _trendRow('Cost Saving',
-              (_results!['costSaving'] as double) / 100, AppColors.purple),
-        ],
-      ),
-    );
-  }
-
-  Widget _trendRow(String label, double value, Color color) {
-    final clamped = value.clamp(0.0, 1.0);
+    final r = _results!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.textMedium)),
-            Text('${(clamped * 100).toStringAsFixed(0)}%',
-                style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-          ],
+        const Text('Calculated KPIs',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.darkBase)),
+        const SizedBox(height: 12),
+        _kpiCard(
+          label: 'Ethylene Production',
+          value: ((r['ethyleneKgHr'] as double?) ?? 0.0).toStringAsFixed(1),
+          unit: 'kg/hr',
+          icon: Icons.bubble_chart_outlined,
+          color: accentColor,
+          description: 'Mass flow rate of ethylene produced from cracking.',
         ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: clamped,
-            backgroundColor: color.withValues(alpha: 0.1),
-            valueColor: AlwaysStoppedAnimation(color),
-            minHeight: 8,
-          ),
+        const SizedBox(height: 12),
+        _kpiCard(
+          label: 'Hydrogen Production',
+          value: ((r['hydrogenKgHr'] as double?) ?? 0.0).toStringAsFixed(1),
+          unit: 'kg/hr',
+          icon: Icons.science_outlined,
+          color: AppColors.cyan,
+          description: 'Mass flow rate of hydrogen recovered from the process.',
+        ),
+        const SizedBox(height: 12),
+        _kpiCard(
+          label: 'CO₂ Emissions',
+          value: ((r['co2eKgHr'] as double?) ?? 0.0).toStringAsFixed(1),
+          unit: 'kg/hr',
+          icon: Icons.cloud_outlined,
+          color: Colors.orange,
+          description: 'CO₂ equivalent emissions from the cracking process.',
         ),
       ],
+    );
+  }
+
+  Widget _kpiCard({
+    required String label,
+    required String value,
+    required String unit,
+    required IconData icon,
+    required Color color,
+    required String description,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+              color: color.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkBase)),
+                const SizedBox(height: 2),
+                Text(description,
+                    style: const TextStyle(
+                        fontSize: 10, color: AppColors.textLight, height: 1.4)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+              Text(unit,
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textMedium)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
