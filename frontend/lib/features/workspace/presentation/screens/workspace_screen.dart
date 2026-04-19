@@ -2,6 +2,56 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/simulation_card.dart';
 import 'simulation_detail_screen.dart';
+import 'co2_assessment_screen.dart';
+
+class _Co2AssessmentCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _Co2AssessmentCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF27AE60);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: green.withValues(alpha: 0.20), width: 1.2),
+          boxShadow: [
+            BoxShadow(color: green.withValues(alpha: 0.10), blurRadius: 18, offset: const Offset(0, 5)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.co2_outlined, color: green, size: 22),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('CO₂ Assessment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+                  SizedBox(height: 3),
+                  Text('PETE geological CO₂ storage feasibility', style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textLight),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class WorkspaceScreen extends StatefulWidget {
   const WorkspaceScreen({super.key});
@@ -112,25 +162,39 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                 const Text('Select a scenario to begin your simulation', style: AppTextStyles.body),
                 const SizedBox(height: 28),
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: _scenarios.length,
-                    itemBuilder: (context, i) {
-                      return FadeTransition(
-                        opacity: _fadeAnimations[i],
-                        child: SlideTransition(
-                          position: _slideAnimations[i],
-                          child: SimulationCard(
-                            scenarioNumber: _scenarios[i]['scenarioNumber'],
-                            title: _scenarios[i]['title'],
-                            tagline: _scenarios[i]['tagline'],
-                            reactionBasis: _scenarios[i]['reactionBasis'],
-                            icon: _scenarios[i]['icon'],
-                            iconColor: _scenarios[i]['color'],
-                            onTap: () => _openScenario(_scenarios[i]),
+                  child: ListView(
+                    children: [
+                      ...List.generate(_scenarios.length, (i) {
+                        return FadeTransition(
+                          opacity: _fadeAnimations[i],
+                          child: SlideTransition(
+                            position: _slideAnimations[i],
+                            child: SimulationCard(
+                              scenarioNumber: _scenarios[i]['scenarioNumber'],
+                              title: _scenarios[i]['title'],
+                              tagline: _scenarios[i]['tagline'],
+                              reactionBasis: _scenarios[i]['reactionBasis'],
+                              icon: _scenarios[i]['icon'],
+                              iconColor: _scenarios[i]['color'],
+                              onTap: () => _openScenario(_scenarios[i]),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      _Co2AssessmentCard(
+                        onTap: () => Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (_, __, ___) => const Co2AssessmentScreen(),
+                            transitionsBuilder: (_, anim, __, child) =>
+                                FadeTransition(opacity: anim, child: child),
+                            transitionDuration: const Duration(milliseconds: 300),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
                 ),
               ],
