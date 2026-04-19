@@ -5,6 +5,60 @@ import '../../../saved/presentation/screens/saved_screen.dart';
 import 'workspace_screen.dart';
 import '../../../account/presentation/screens/account_screen.dart';
 
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final int index;
+  final int current;
+  final ValueChanged<int> onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.index,
+    required this.current,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = index == current;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.cyan.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? activeIcon : icon,
+              size: 22,
+              color: selected ? AppColors.cyan : const Color(0xFFADB5BD),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected ? AppColors.cyan : const Color(0xFFADB5BD),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MainShell extends StatefulWidget {
   final int initialIndex;
   const MainShell({super.key, this.initialIndex = 1});
@@ -46,49 +100,28 @@ class _MainShellState extends State<MainShell> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.9),
                   width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryBlue.withOpacity(0.12),
+                    color: AppColors.primaryBlue.withValues(alpha: 0.10),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: BottomNavigationBar(
-                currentIndex: _currentIndex,
-                onTap: (i) => setState(() => _currentIndex = i),
-                backgroundColor: Colors.transparent,
-                selectedItemColor: AppColors.cyan,
-                unselectedItemColor: AppColors.textLight,
-                selectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                ),
-                unselectedLabelStyle: const TextStyle(fontSize: 11),
-                elevation: 0,
-                items: const [
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.bookmark_outline),
-                    activeIcon: Icon(Icons.bookmark),
-                    label: 'Saved',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.home_outlined),
-                    activeIcon: Icon(Icons.home_rounded),
-                    label: 'Workspace',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline),
-                    activeIcon: Icon(Icons.person_rounded),
-                    label: 'Account',
-                  ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(icon: Icons.bookmark_outline, activeIcon: Icons.bookmark, label: 'Saved',    index: 0, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
+                  _NavItem(icon: Icons.home_outlined,    activeIcon: Icons.home_rounded,  label: 'Workspace', index: 1, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
+                  _NavItem(icon: Icons.person_outline,   activeIcon: Icons.person_rounded, label: 'Account',   index: 2, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
                 ],
               ),
             ),

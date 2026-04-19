@@ -37,32 +37,108 @@ class _SavedScreenState extends State<SavedScreen> {
     return _scenarios.where((s) => s['status'] == _filter).toList();
   }
 
-  void _confirmDelete(int realIndex) {
+  void _confirmDelete(Map<String, dynamic> s) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Scenario',
-            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-        content: Text(
-          'Are you sure you want to delete "${_scenarios[realIndex]['name']}"?',
-          style: const TextStyle(color: AppColors.textMedium),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.20), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.12),
+                  blurRadius: 40,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.delete_outline, color: Colors.red, size: 28),
+                ),
+                const SizedBox(height: 20),
+                const Text('Delete Scenario',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.darkBase)),
+                const SizedBox(height: 8),
+                Text(
+                  'Are you sure you want to delete "${s['name']}"? This cannot be undone.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textMedium, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.inputBg,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text('Cancel',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMedium)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await ScenarioService.deleteScenario(
+                            userId:     s['userId'] as String,
+                            scenarioId: s['scenarioId'] as String,
+                            s3Key:      s['s3Key'] as String,
+                          );
+                          await _load();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text('Delete',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textLight)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await ScenarioService.deleteScenario(realIndex);
-              await _load();
-            },
-            child: const Text('Delete',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
   }
@@ -94,6 +170,12 @@ class _SavedScreenState extends State<SavedScreen> {
                       const SizedBox(width: 10),
                       ..._filters.map((f) {
                         final selected = _filter == f;
+                        final Color chipColor = switch (f) {
+                          'Optimal'  => const Color(0xFF2ECC71),
+                          'Warning'  => const Color(0xFFF39C12),
+                          'Critical' => const Color(0xFFE74C3C),
+                          _          => AppColors.cyan,
+                        };
                         return GestureDetector(
                           onTap: () => setState(() => _filter = f),
                           child: AnimatedContainer(
@@ -101,17 +183,32 @@ class _SavedScreenState extends State<SavedScreen> {
                             margin: const EdgeInsets.only(right: 8),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: selected ? AppColors.cyan : Colors.white,
+                              color: selected
+                                  ? chipColor.withValues(alpha: 0.15)
+                                  : Colors.white.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: selected ? AppColors.cyan : AppColors.inputBorder,
+                                color: selected
+                                    ? chipColor.withValues(alpha: 0.6)
+                                    : Colors.white.withValues(alpha: 0.8),
+                                width: 1.2,
                               ),
+                              boxShadow: selected
+                                  ? [
+                                      BoxShadow(
+                                        color: chipColor.withValues(alpha: 0.25),
+                                        blurRadius: 12,
+                                        spreadRadius: 1,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ]
+                                  : [],
                             ),
                             child: Text(f,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: selected ? Colors.white : AppColors.textMedium,
+                                  color: selected ? chipColor : AppColors.textMedium,
                                 )),
                           ),
                         );
@@ -200,7 +297,7 @@ class _SavedScreenState extends State<SavedScreen> {
     },
   };
 
-  void _openSavedScenario(Map<String, dynamic> s) {
+  Future<void> _openSavedScenario(Map<String, dynamic> s) async {
     final scenarioTitle = s['scenario'] as String;
     final scenarioData = Map<String, dynamic>.from(
       _scenarioMeta[scenarioTitle] ?? {
@@ -212,21 +309,167 @@ class _SavedScreenState extends State<SavedScreen> {
       },
     );
 
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => SimulationResultsScreen(
-          scenario: scenarioData,
-          temperature: s['temperature'] as String,
-          pressure: s['pressure'] as String,
-          scenarioId: s['scenarioId'] as String? ?? 'S1',
-          selectedValue: s['selectedValue'] ?? '',
+    if (!mounted) return;
+
+    // ── Liquid glass loading dialog ───────────────────────────────────────────
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: AppColors.cyan.withValues(alpha: 0.18), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cyan.withValues(alpha: 0.18),
+                  blurRadius: 40,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.cyan.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: CircularProgressIndicator(color: AppColors.cyan, strokeWidth: 2.5),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('Loading Scenario',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.darkBase)),
+                const SizedBox(height: 8),
+                const Text('Fetching your saved results…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMedium,
+                        height: 1.5)),
+              ],
+            ),
+          ),
         ),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
+
+    try {
+      final rawData = await ScenarioService.getScenarioResults(s['s3Key'] as String);
+      if (!mounted) return;
+      Navigator.pop(context); // close loader
+
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => SimulationResultsScreen(
+            scenario:      scenarioData,
+            temperature:   s['temperature'] as String,
+            pressure:      s['pressure'] as String,
+            scenarioId:    s['scenarioId'] as String? ?? 'S1',
+            selectedValue: s['selectedValue'] ?? '',
+            useReservoir:  s['useReservoir'] as bool? ?? false,
+            cachedRawData: rawData,
+          ),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 300),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // close loader
+
+      // ── Liquid glass error dialog ─────────────────────────────────────────
+      showDialog(
+        context: context,
+        builder: (_) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.20), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    blurRadius: 40,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.error_outline, color: Colors.red, size: 28),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Failed to Load',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkBase)),
+                  const SizedBox(height: 8),
+                  const Text('Could not retrieve the scenario results.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
+                  const SizedBox(height: 8),
+                  Text(e.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textLight, height: 1.4)),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.darkBase,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text('Dismiss',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _scenarioCard(Map<String, dynamic> s, int index) {
@@ -257,7 +500,7 @@ class _SavedScreenState extends State<SavedScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryBlue.withOpacity(0.07),
+            color: AppColors.primaryBlue.withValues(alpha: 0.07),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -277,24 +520,17 @@ class _SavedScreenState extends State<SavedScreen> {
                       color: AppColors.darkBase,
                     )),
               ),
-              PopupMenuButton<String>(
-                onSelected: (val) {
-                  if (val == 'delete') _confirmDelete(index);
-                },
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
+              GestureDetector(
+                onTap: () => _confirmDelete(s),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
-                child: const Icon(Icons.more_vert, color: AppColors.textLight, size: 20),
+                  child: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                ),
               ),
             ],
           ),
@@ -313,7 +549,7 @@ class _SavedScreenState extends State<SavedScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(

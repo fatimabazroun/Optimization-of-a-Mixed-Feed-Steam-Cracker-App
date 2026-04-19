@@ -1,12 +1,11 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
-/// Persists scenarios per-user using SharedPreferences keyed by Cognito sub.
 class ScenarioService {
-  static String _key(String sub) => 'scenarios_$sub';
+  static String get _apiUrl => dotenv.env['SCENARIO_API_URL']!;
 
-  /// Returns the current user's sub, or null if not signed in.
   static Future<String?> _currentSub() async {
     try {
       final attrs = await AuthService.fetchUserAttributes();
@@ -16,39 +15,59 @@ class ScenarioService {
     }
   }
 
-  /// Loads all saved scenarios for the current user.
+  static Future<Map<String, dynamic>> _post(Map<String, dynamic> payload) async {
+    final response = await http
+        .post(
+          Uri.parse(_apiUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(payload),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Request failed (${response.statusCode})');
+    }
+    return data;
+  }
+
   static Future<List<Map<String, dynamic>>> loadScenarios() async {
     final sub = await _currentSub();
     if (sub == null) return [];
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key(sub));
-    if (raw == null) return [];
-    final list = jsonDecode(raw) as List<dynamic>;
+    final data = await _post({'action': 'list', 'userId': sub});
+    final list = data['scenarios'] as List<dynamic>;
     return list.cast<Map<String, dynamic>>();
   }
 
-  /// Saves the full scenarios list for the current user.
-  static Future<void> _persist(String sub, List<Map<String, dynamic>> scenarios) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key(sub), jsonEncode(scenarios));
-  }
-
-  /// Adds a new scenario to the top of the current user's list.
-  static Future<void> addScenario(Map<String, dynamic> scenario) async {
+  static Future<void> addScenario(
+    Map<String, dynamic> metadata,
+    Map<String, dynamic> rawResults,
+  ) async {
     final sub = await _currentSub();
     if (sub == null) return;
-    final list = await loadScenarios();
-    list.insert(0, scenario);
-    await _persist(sub, list);
+    await _post({
+      'action':   'save',
+      'userId':   sub,
+      'metadata': metadata,
+      'results':  rawResults,
+    });
   }
 
-  /// Removes the scenario at [index] from the current user's list.
-  static Future<void> deleteScenario(int index) async {
-    final sub = await _currentSub();
-    if (sub == null) return;
-    final list = await loadScenarios();
-    if (index < 0 || index >= list.length) return;
-    list.removeAt(index);
-    await _persist(sub, list);
+  static Future<Map<String, dynamic>> getScenarioResults(String s3Key) async {
+    final data = await _post({'action': 'get', 's3Key': s3Key});
+    return data['results'] as Map<String, dynamic>;
+  }
+
+  static Future<void> deleteScenario({
+    required String userId,
+    required String scenarioId,
+    required String s3Key,
+  }) async {
+    await _post({
+      'action':     'delete',
+      'userId':     userId,
+      'scenarioId': scenarioId,
+      's3Key':      s3Key,
+    });
   }
 }

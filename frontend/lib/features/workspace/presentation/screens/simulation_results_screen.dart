@@ -15,6 +15,8 @@ class SimulationResultsScreen extends StatefulWidget {
   final dynamic selectedValue;
   final bool useReservoir;
   final Map<String, dynamic>? reservoirInputs;
+  // When opening a saved scenario, pass the raw API response to skip re-running.
+  final Map<String, dynamic>? cachedRawData;
 
   const SimulationResultsScreen({
     super.key,
@@ -25,6 +27,7 @@ class SimulationResultsScreen extends StatefulWidget {
     required this.selectedValue,
     this.useReservoir = false,
     this.reservoirInputs,
+    this.cachedRawData,
   });
 
   @override
@@ -40,6 +43,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   late final List<String> _tabs;
 
   Map<String, dynamic>? _results;
+  Map<String, dynamic>? _rawApiData;
   bool _isLoading = true;
   String? _error;
 
@@ -60,14 +64,16 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
   Future<void> _loadResults() async {
     try {
-      final data = await SimulationService.runSimulation(
-        scenarioId: widget.scenarioId,
-        selectedValue: widget.selectedValue,
-        useReservoir: widget.useReservoir,
-        reservoirInputs: widget.reservoirInputs,
-      );
+      final data = widget.cachedRawData ??
+          await SimulationService.runSimulation(
+            scenarioId: widget.scenarioId,
+            selectedValue: widget.selectedValue,
+            useReservoir: widget.useReservoir,
+            reservoirInputs: widget.reservoirInputs,
+          );
       if (mounted) {
         setState(() {
+          _rawApiData = data;
           _results = _mapApiResponse(data);
           _isLoading = false;
         });
@@ -248,14 +254,16 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                         // Action buttons
                         Row(
                           children: [
-                            Expanded(
-                                child: _GlowActionButton(
-                                    icon: Icons.bookmark_outline,
-                                    label: 'Save',
-                                    accentColor: accentColor,
-                                    onTap: () =>
-                                        _showSaveDialog(context, accentColor))),
-                            const SizedBox(width: 12),
+                            if (widget.cachedRawData == null) ...[
+                              Expanded(
+                                  child: _GlowActionButton(
+                                      icon: Icons.bookmark_outline,
+                                      label: 'Save',
+                                      accentColor: accentColor,
+                                      onTap: () =>
+                                          _showSaveDialog(context, accentColor))),
+                              const SizedBox(width: 12),
+                            ],
                             Expanded(
                                 child: _GlowActionButton(
                                     icon: Icons.download_outlined,
@@ -1213,6 +1221,22 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
   }
 
+  String _deriveStatus() {
+    if (widget.useReservoir) {
+      final feas = _results!['feasibility'] as String;
+      if (feas == 'Feasible') return 'Optimal';
+      if (feas == 'Conditional') return 'Warning';
+      if (feas == 'Infeasible') return 'Critical';
+    }
+    final perf = _results!['performance'] as Map<String, dynamic>;
+    final statuses = perf.values
+        .map((v) => ((v as Map<String, dynamic>)['status'] as String? ?? '').toLowerCase())
+        .toList();
+    if (statuses.any((s) => s.contains('critical') || s.contains('infeasible'))) return 'Critical';
+    if (statuses.any((s) => s.contains('moderate') || s.contains('warning') || s.contains('needs'))) return 'Warning';
+    return 'Optimal';
+  }
+
   Future<void> _saveScenario(BuildContext context, String name) async {
     try {
       final now = DateTime.now();
@@ -1220,67 +1244,203 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       final date =
           '${_monthName(now.month)} ${now.day}, ${now.year} at ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-      await ScenarioService.addScenario({
-        'name': name,
-        'date': date,
-        'simId': simId,
-        'status': (_results!['feasibility'] as String) == 'Feasible'
-            ? 'Optimal'
-            : (_results!['feasibility'] as String) == 'Conditional'
-                ? 'Warning'
-                : 'Critical',
-        'temperature': widget.temperature,
-        'pressure': widget.pressure,
-        'scenario': widget.scenario['title'],
-        'scenarioId': widget.scenarioId,
-        'selectedValue': widget.selectedValue,
-      });
+      await ScenarioService.addScenario(
+        {
+          'name':          name,
+          'date':          date,
+          'simId':         simId,
+          'status':        _deriveStatus(),
+          'temperature':   widget.temperature,
+          'pressure':      widget.pressure,
+          'scenario':      widget.scenario['title'],
+          'scenarioId':    widget.scenarioId,
+          'selectedValue': widget.selectedValue,
+          'useReservoir':  widget.useReservoir,
+        },
+        _rawApiData ?? {},
+      );
 
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Scenario saved successfully!'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2ECC71),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          action: SnackBarAction(
-            label: 'View Saved',
-            textColor: Colors.white,
-            onPressed: () => Navigator.pushAndRemoveUntil(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (_, __, ___) => const MainShell(initialIndex: 0),
-                transitionsBuilder: (_, anim, __, child) =>
-                    FadeTransition(opacity: anim, child: child),
-                transitionDuration: const Duration(milliseconds: 400),
+      showDialog(
+        context: context,
+        builder: (_) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                    color: const Color(0xFF2ECC71).withValues(alpha: 0.25),
+                    width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
+                    blurRadius: 40,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              (route) => false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2ECC71).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_circle_outline,
+                        color: Color(0xFF2ECC71), size: 28),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Scenario Saved',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkBase)),
+                  const SizedBox(height: 8),
+                  const Text('Your simulation has been saved successfully.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textMedium,
+                          height: 1.5)),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.inputBg,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Text('Dismiss',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textMedium)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pushAndRemoveUntil(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder: (_, __, ___) =>
+                                  const MainShell(initialIndex: 0),
+                              transitionsBuilder: (_, anim, __, child) =>
+                                  FadeTransition(opacity: anim, child: child),
+                              transitionDuration:
+                                  const Duration(milliseconds: 400),
+                            ),
+                            (route) => false,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.darkBase,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Text('View Saved',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.cancel_outlined, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Error in Saving Scenario'),
-            ],
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.20), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    blurRadius: 40,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.error_outline, color: Colors.red, size: 28),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Save Failed',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkBase)),
+                  const SizedBox(height: 8),
+                  const Text('Could not save the scenario.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
+                  const SizedBox(height: 8),
+                  Text(e.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textLight, height: 1.4)),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.darkBase,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text('Dismiss',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }

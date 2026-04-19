@@ -397,34 +397,111 @@ class _AccountScreenState extends State<AccountScreen> {
   void _confirmLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-        content: const Text('Are you sure you want to log out?', style: TextStyle(color: AppColors.textMedium)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textLight)),
-          ),
-          TextButton(
-            onPressed: () async {
-              final nav = Navigator.of(context);
-              nav.pop();
-              await AuthService.signOut();
-              if (!mounted) return;
-              nav.pushAndRemoveUntil(
-                PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => const SplashScreen(),
-                  transitionsBuilder: (_, anim, __, child) =>
-                      FadeTransition(opacity: anim, child: child),
-                  transitionDuration: const Duration(milliseconds: 400),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.20), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withValues(alpha: 0.12),
+                  blurRadius: 40,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
                 ),
-                (route) => false,
-              );
-            },
-            child: const Text('Log Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.logout_rounded, color: Colors.red, size: 28),
+                ),
+                const SizedBox(height: 20),
+                const Text('Log Out',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.darkBase)),
+                const SizedBox(height: 8),
+                const Text('Are you sure you want to log out?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMedium,
+                        height: 1.5)),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.inputBg,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text('Cancel',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMedium)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final nav = Navigator.of(context);
+                          nav.pop();
+                          await AuthService.signOut();
+                          if (!mounted) return;
+                          nav.pushAndRemoveUntil(
+                            PageRouteBuilder(
+                              pageBuilder: (_, __, ___) => const SplashScreen(),
+                              transitionsBuilder: (_, anim, __, child) =>
+                                  FadeTransition(opacity: anim, child: child),
+                              transitionDuration: const Duration(milliseconds: 400),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text('Log Out',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
