@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import 'configure_simulation_screen.dart';
 
 class SimulationDetailScreen extends StatefulWidget {
@@ -22,24 +23,6 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
       'definition': 'Mass fraction of ethylene produced relative to total feed input.',
       'matters': 'Primary product metric — directly impacts revenue and process efficiency.',
       'interpretation': 'Higher values indicate better cracking performance. Target >30% for ethane feed.',
-    },
-    {
-      'title': 'Flash Temperature',
-      'definition': 'Temperature at which the feed mixture undergoes phase separation in the flash drum.',
-      'matters': 'Controls vapor-liquid equilibrium and feed composition entering the furnace.',
-      'interpretation': 'Optimal range varies by feed type. Deviations affect yield distribution significantly.',
-    },
-    {
-      'title': 'Flash Pressure',
-      'definition': 'Operating pressure maintained in the flash separation unit.',
-      'matters': 'Directly influences vapor fraction and component distribution in the feed.',
-      'interpretation': 'Higher pressure increases liquid fraction. Must be balanced with downstream constraints.',
-    },
-    {
-      'title': 'Fuel Duty',
-      'definition': 'Total energy consumption of the cracking furnace in MW.',
-      'matters': 'Key cost driver — fuel accounts for 60–70% of operating costs in steam cracking.',
-      'interpretation': 'Lower values indicate better energy efficiency.',
     },
     {
       'title': 'CO₂ Emissions',
@@ -80,8 +63,7 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
     final Color accentColor = s['color'] as Color;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fade,
@@ -94,11 +76,11 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     child: GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                          Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
                           SizedBox(width: 4),
-                          Text('Back to Workspace', style: AppTextStyles.body),
+                          Text('Back to Workspace', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                         ],
                       ),
                     ),
@@ -127,52 +109,59 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Text(s['title'] as String, style: AppTextStyles.heading1),
-                          const SizedBox(height: 6),
+                          SizedBox(height: 10),
+                          Text(s['title'] as String, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                          SizedBox(height: 6),
                           Text(s['tagline'] as String,
-                              style: const TextStyle(fontSize: 14, color: AppColors.textMedium, height: 1.5)),
-                          const SizedBox(height: 20),
+                              style: TextStyle(fontSize: 14, color: context.textSecondary, height: 1.5)),
+                          SizedBox(height: 20),
 
-                          // Image placeholder — replace Container with Image.asset() when ready
                           Container(
                             width: double.infinity,
-                            height: 180,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: context.surface,
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryBlue.withValues(alpha: 0.07),
+                                  color: context.cardShadow,
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image_outlined, size: 40, color: accentColor.withValues(alpha: 0.35)),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${s['scenarioNumber']} — Schematic',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textLight),
-                                ),
-                              ],
-                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: s['schematic'] != null
+                                ? Image.asset(
+                                    s['schematic'] as String,
+                                    fit: BoxFit.contain,
+                                  )
+                                : SizedBox(
+                                    height: 180,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.image_outlined, size: 40, color: accentColor.withValues(alpha: 0.35)),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          '${s['scenarioNumber']} — Schematic',
+                                          style: TextStyle(fontSize: 12, color: context.textTertiary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
 
-                          const SizedBox(height: 24),
+                          SizedBox(height: 24),
 
                           // Scenario info cards
-                          const Text('Scenario Overview',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                          const SizedBox(height: 12),
+                          Text('Scenario Overview',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                          SizedBox(height: 12),
                           _paramCard(Icons.description_outlined, 'Description', s['description'] as String, accentColor),
-                          const SizedBox(height: 10),
+                          SizedBox(height: 10),
                           _paramCard(Icons.science_outlined, 'Reaction Basis', s['reactionBasis'] as String, accentColor),
 
-                          const SizedBox(height: 24),
+                          SizedBox(height: 24),
 
                           _GlowButton(
                             accentColor: accentColor,
@@ -188,22 +177,21 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                             ),
                           ),
 
-                          const SizedBox(height: 32),
+                          SizedBox(height: 32),
 
-                          // Output Variables — scroll down to see
-                          const Text('Output Variables Explained',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                          const SizedBox(height: 16),
+                          Text('Output Variables Explained',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                          SizedBox(height: 16),
 
                           ..._variables.map((v) => Container(
                             margin: const EdgeInsets.only(bottom: 14),
                             padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: context.surface,
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryBlue.withValues(alpha: 0.07),
+                                  color: context.cardShadow,
                                   blurRadius: 14,
                                   offset: const Offset(0, 4),
                                 ),
@@ -219,21 +207,21 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                                     color: AppColors.cyan.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.info_outline, color: AppColors.cyan, size: 18),
+                                  child: Icon(Icons.info_outline, color: AppColors.cyan, size: 18),
                                 ),
-                                const SizedBox(width: 14),
+                                SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(v['title']!,
-                                          style: const TextStyle(
-                                              fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                                      const SizedBox(height: 6),
+                                          style: TextStyle(
+                                              fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                                      SizedBox(height: 6),
                                       _richLine('Definition: ', v['definition']!),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: 4),
                                       _richLine('Why it matters: ', v['matters']!),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: 4),
                                       _richLine('Interpretation: ', v['interpretation']!),
                                     ],
                                   ),
@@ -242,7 +230,7 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
                             ),
                           )),
 
-                          const SizedBox(height: 32),
+                          SizedBox(height: 32),
                         ],
                       ),
                     ),
@@ -256,11 +244,22 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
     );
   }
 
+  Widget _richLine(String label, String value) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(text: label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.cyan)),
+          TextSpan(text: value, style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.5)),
+        ],
+      ),
+    );
+  }
+
   Widget _paramCard(IconData icon, String label, String value, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 3)),
@@ -273,14 +272,14 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
             decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
-                const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.darkBase, height: 1.4)),
+                Text(label, style: TextStyle(fontSize: 11, color: context.textTertiary)),
+                SizedBox(height: 2),
+                Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: context.textPrimary, height: 1.4)),
               ],
             ),
           ),
@@ -289,16 +288,7 @@ class _SimulationDetailScreenState extends State<SimulationDetailScreen>
     );
   }
 
-  Widget _richLine(String label, String value) {
-    return RichText(
-      text: TextSpan(
-        children: [
-          TextSpan(text: label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.cyan)),
-          TextSpan(text: value, style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.5)),
-        ],
-      ),
-    );
-  }
+
 }
 
 class _GlowButton extends StatefulWidget {
@@ -313,160 +303,73 @@ class _GlowButton extends StatefulWidget {
 
 class _GlowButtonState extends State<_GlowButton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _borderProgress;
-  late Animation<double> _glowRadius;
-  late Animation<double> _fadeOut;
-  bool _tapped = false;
+  AnimationController? _ctrl;
+  double _scale = 1.0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 600),
     );
-
-    // Border draws from 0 to 1 in first 65%
-    _borderProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.65, curve: Curves.easeInOut),
-      ),
-    );
-
-    // Glow grows as border draws
-    _glowRadius = Tween<double>(begin: 6.0, end: 30.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.65, curve: Curves.easeOut),
-      ),
-    );
-
-    // No fade — button stays visible throughout
-    _fadeOut = Tween<double>(begin: 1.0, end: 1.0).animate(_controller);
-
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        widget.onPressed();
-        // Reset for next time
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            _controller.reset();
-            setState(() => _tapped = false);
-          }
-        });
-      }
+    _ctrl!.addListener(() {
+      setState(() => _scale = 1.0 - (_ctrl!.value * 0.07));
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl?.dispose();
     super.dispose();
   }
 
   void _handleTap() {
-    if (_tapped) return;
-    setState(() => _tapped = true);
-    _controller.forward();
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    ctrl.forward(from: 0.0).then((_) {
+      if (!mounted) return;
+      widget.onPressed();
+      ctrl.animateBack(0.0, curve: Curves.elasticOut);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _handleTap,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) {
-          return SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: Stack(
-              children: [
-                // Button fades out
-                Opacity(
-                  opacity: _fadeOut.value,
-                  child: Container(
-                    width: double.infinity,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [widget.accentColor, AppColors.primaryBlue],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.accentColor.withValues(alpha: 0.55),
-                          blurRadius: _glowRadius.value,
-                          spreadRadius: _glowRadius.value * 0.2,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.play_circle_outline_rounded,
-                            color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text('Start Simulation', style: AppTextStyles.buttonText),
-                      ],
-                    ),
-                  ),
-                ),
-                // Border draws ON TOP of button
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _BorderDrawPainter(
-                      progress: _borderProgress.value,
-                      color: widget.accentColor,
-                    ),
-                  ),
-                ),
-              ],
+      child: Transform.scale(
+        scale: _scale,
+        child: Container(
+          width: double.infinity,
+          height: 52,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [widget.accentColor, AppColors.primaryBlue],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-          );
-        },
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: widget.accentColor.withValues(alpha: 0.55),
+                blurRadius: 18,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.play_circle_outline_rounded, color: context.surface, size: 20),
+              SizedBox(width: 8),
+              Text('Start Simulation', style: AppTextStyles.buttonText),
+            ],
+          ),
+        ),
       ),
     );
   }
-}
-
-class _BorderDrawPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-
-  _BorderDrawPainter({required this.progress, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress == 0) return;
-
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      const Radius.circular(30),
-    );
-
-    // Total perimeter
-    final perimeter = 2 * (size.width + size.height);
-    final drawn = perimeter * progress;
-
-    final path = Path()..addRRect(rect);
-    final metrics = path.computeMetrics().first;
-    final drawPath = metrics.extractPath(0, drawn.clamp(0, metrics.length));
-
-    canvas.drawPath(drawPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(_BorderDrawPainter old) => old.progress != progress;
 }

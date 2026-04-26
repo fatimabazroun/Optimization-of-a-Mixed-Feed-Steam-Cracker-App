@@ -21,33 +21,37 @@ class GradientButton extends StatefulWidget {
 
 class _GradientButtonState extends State<GradientButton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  AnimationController? _ctrl;
+  double _scale = 1.0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 100),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _ctrl!.addListener(() {
+      setState(() => _scale = 1.0 - (_ctrl!.value * 0.07));
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl?.dispose();
     super.dispose();
   }
 
-  void _onTapDown(_) { if (widget.onPressed != null) _controller.forward(); }
-  void _onTapUp(_) {
-    _controller.reverse();
-    widget.onPressed?.call();
+  void _onTapDown(_) {
+    if (widget.onPressed != null) _ctrl?.forward(from: 0.0);
   }
-  void _onTapCancel() => _controller.reverse();
+
+  void _onTapUp(_) {
+    widget.onPressed?.call();
+    _ctrl?.animateBack(0.0, curve: Curves.elasticOut);
+  }
+
+  void _onTapCancel() => _ctrl?.animateBack(0.0, curve: Curves.elasticOut);
 
   @override
   Widget build(BuildContext context) {
@@ -55,29 +59,28 @@ class _GradientButtonState extends State<GradientButton>
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
       onTapCancel: _onTapCancel,
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) => Opacity(
-          opacity: widget.onPressed == null ? 0.55 : 1.0,
-          child: Transform.scale(scale: _scaleAnimation.value, child: child),
-        ),
-        child: SizedBox(
-          width: widget.width ?? double.infinity,
-          height: 52,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: widget.gradient ?? AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryBlue.withOpacity(0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(widget.text, style: AppTextStyles.buttonText),
+      child: Opacity(
+        opacity: widget.onPressed == null ? 0.55 : 1.0,
+        child: Transform.scale(
+          scale: _scale,
+          child: SizedBox(
+            width: widget.width ?? double.infinity,
+            height: 52,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: widget.gradient ?? AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryBlue.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(widget.text, style: AppTextStyles.buttonText),
+              ),
             ),
           ),
         ),

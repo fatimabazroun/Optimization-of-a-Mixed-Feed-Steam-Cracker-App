@@ -162,9 +162,11 @@ def build_ise_result(scenario_id, selected_value):
     return None
 
 
+EULER_GAMMA = 0.5772156649
+
+
 def compute_allowable_pressure(inputs):
     safety_margin = inputs.get("safety_margin", 1.5)
-
     fracture_pressure = inputs.get("fracture_pressure")
     fracture_gradient = inputs.get("fracture_gradient")
     depth = inputs.get("depth")
@@ -179,143 +181,163 @@ def compute_allowable_pressure(inputs):
     return p_frac - safety_margin, p_frac
 
 
-def pressure_open_mpa(t_hr, inputs, q_per_well_vol_m3_hr):
-    mu_cp = inputs.get("co2_viscosity", 0.05)
-    k_md = inputs["permeability"]
-    h_m = inputs["thickness"]
-    ct_per_mpa = inputs.get("compressibility", 1e-4)
-    rw_m = inputs.get("well_radius", 0.1)
-    p_init_mpa = inputs["initial_pressure"]
-    skin = inputs.get("skin", 0.0)
-
-    gamma = 0.577
-    denom = max(2 * math.pi * k_md * h_m, 1e-9)
-    arg = max(t_hr / max((rw_m ** 2) * ct_per_mpa, 1e-9), 1.000001)
-
-    delta_p = ((q_per_well_vol_m3_hr * mu_cp) / denom) * (math.log(arg) + gamma + skin)
-    return p_init_mpa + delta_p
+def _delta_p_open_pa(t_s, k_m2, h_m, phi, mu_pa_s, ct_pa, rw_m, skin, q_m3_s):
+    arg = (4.0 * k_m2 * t_s) / max(phi * mu_pa_s * ct_pa * rw_m ** 2, 1e-40)
+    arg = max(arg, 1.000001)
+    return (q_m3_s * mu_pa_s) / (4.0 * math.pi * k_m2 * h_m) * (math.log(arg) - EULER_GAMMA + skin)
 
 
-def pressure_closed_mpa(t_hr, inputs, q_per_well_vol_m3_hr):
-    re_m = inputs["radius"]
-    ct_per_mpa = inputs.get("compressibility", 1e-4)
-    t_boundary = max((re_m ** 2) * ct_per_mpa, 1e-9)
+def pressure_at_time_mpa(t_hr, inputs, q_per_well_vol_m3_hr):
+    mu_pa_s  = inputs.get("co2_viscosity", 0.05) * 1e-3
+    k_m2     = inputs["permeability"] * 9.869233e-16
+    h_m      = inputs["thickness"]
+    phi      = max(inputs["porosity"], 1e-9)
+    ct_pa    = inputs.get("compressibility", 1e-4) / 1e6
+    rw_m     = inputs.get("well_radius", 0.1)
+    p_i_mpa  = inputs["initial_pressure"]
+    skin     = inputs.get("skin", 0.0)
 
-    if t_hr < t_boundary:
-        return pressure_open_mpa(t_hr, inputs, q_per_well_vol_m3_hr)
+    t0_s  = inputs.get("log_start_time", 1.0) * 24 * 3600
+    t_s   = max(t_hr * 3600.0, t0_s)
+    q_m3s = q_per_well_vol_m3_hr / 3600.0
 
-    p_open = pressure_open_mpa(t_hr, inputs, q_per_well_vol_m3_hr)
-    p_init = inputs["initial_pressure"]
-    return p_init + (p_open - p_init) * 1.5
+    dp_pa  = _delta_p_open_pa(t_s, k_m2, h_m, phi, mu_pa_s, ct_pa, rw_m, skin, q_m3s)
+    dp_mpa = dp_pa / 1e6
+
+    if inputs.get("reservoir_type", "Open").strip().lower() == "closed":
+        alpha = inputs.get("closed_multiplier", 3.0)
+        dp_mpa *= alpha
+
+    return p_i_mpa + dp_mpa
 
 
 def find_max_safe_injection_time_years(inputs, q_per_well_vol_m3_hr, p_allow_mpa):
-    reservoir_type = inputs["reservoir_type"].strip().lower()
-    max_safe_years = 0.0
+    mu_pa_s = inputs.get("co2_viscosity", 0.05) * 1e-3
+    k_m2    = inputs["permeability"] * 9.869233e-16
+    h_m     = inputs["thickness"]
+    phi     = max(inputs["porosity"], 1e-9)
+    ct_pa   = inputs.get("compressibility", 1e-4) / 1e6
+    rw_m    = inputs.get("well_radius", 0.1)
+    skin    = inputs.get("skin", 0.0)
+    q_m3s   = q_per_well_vol_m3_hr / 3600.0
 
-    for month in range(1, 1201):
-        t_hr = month * 30 * 24
+    A = (q_m3s * mu_pa_s) / (4.0 * math.pi * k_m2 * h_m)
+    B = (4.0 * k_m2) / max(phi * mu_pa_s * ct_pa * rw_m ** 2, 1e-40)
 
-        if reservoir_type == "open":
-            p_t = pressure_open_mpa(t_hr, inputs, q_per_well_vol_m3_hr)
-        else:
-            p_t = pressure_closed_mpa(t_hr, inputs, q_per_well_vol_m3_hr)
+    alpha = 1.0
+    if inputs.get("reservoir_type", "Open").strip().lower() == "closed":
+        alpha = inputs.get("closed_multiplier", 3.0)
 
-        if p_t >= p_allow_mpa:
-            break
+    dp_pa = (p_allow_mpa - inputs["initial_pressure"]) * 1e6
+    if dp_pa <= 0 or A <= 0:
+        return 0.0
 
-        max_safe_years = month / 12.0
+    log_arg = dp_pa / (alpha * A) + EULER_GAMMA - skin
+    if log_arg > 700:
+        return 100.0
 
-    return round(max_safe_years, 2)
+    t0_s     = inputs.get("log_start_time", 1.0) * 24 * 3600
+    t_safe_s = max(math.exp(log_arg) / B, t0_s)
+    t_safe_yr = t_safe_s / (365 * 24 * 3600)
+
+    return round(min(t_safe_yr, 100.0), 2)
 
 
 def compute_max_sustainable_rate_kg_hr(inputs, q_total_kg_hr, p_allow_mpa):
-    duration_years = inputs["project_duration"]
-    reservoir_type = inputs["reservoir_type"].strip().lower()
+    target_t_hr = inputs["project_duration"] * 365 * 24
     n_wells = inputs["n_wells"]
     rho = inputs.get("co2_density", 700)
-    target_t_hr = duration_years * 365 * 24
 
-    low = 0.0
-    high = max(q_total_kg_hr * 5, 1.0)
-    best = 0.0
-
-    for _ in range(50):
+    low, high, best = 0.0, max(q_total_kg_hr * 10, 1.0), 0.0
+    for _ in range(60):
         mid = (low + high) / 2.0
-        q_per_well_vol = (mid / n_wells) / rho
-
-        if reservoir_type == "open":
-            p_end = pressure_open_mpa(target_t_hr, inputs, q_per_well_vol)
-        else:
-            p_end = pressure_closed_mpa(target_t_hr, inputs, q_per_well_vol)
-
-        if p_end <= p_allow_mpa:
+        q_per_well = (mid / n_wells) / rho
+        if pressure_at_time_mpa(target_t_hr, inputs, q_per_well) <= p_allow_mpa:
             best = mid
             low = mid
         else:
             high = mid
-
     return round(best, 2)
+
+
+def _plume_radius_at_t(t_hr, inputs, q_per_well_vol_m3_hr):
+    phi   = max(inputs["porosity"], 1e-9)
+    h_m   = max(inputs["thickness"], 1e-9)
+    s_co2 = max(inputs.get("co2_saturation", 0.2), 1e-9)
+    vol   = q_per_well_vol_m3_hr * t_hr
+    return math.sqrt(vol / (math.pi * phi * h_m * s_co2))
 
 
 def compute_plume_radius_m(inputs, q_per_well_vol_m3_hr):
     duration_hr = inputs["project_duration"] * 365 * 24
-    phi = inputs["porosity"]
-    h_m = inputs["thickness"]
+    return round(_plume_radius_at_t(duration_hr, inputs, q_per_well_vol_m3_hr), 2)
 
-    accessible_volume = q_per_well_vol_m3_hr * duration_hr
-    radius = math.sqrt(accessible_volume / (math.pi * max(phi * h_m, 1e-9)))
 
-    return round(radius, 2)
+def generate_time_series(inputs, q_per_well_vol, max_safe_years, n_points=60):
+    project_duration = inputs["project_duration"]
+
+    if 0 < max_safe_years < 100:
+        max_t_yr = min(max_safe_years * 1.5, 100.0)
+    else:
+        max_t_yr = project_duration * 1.5
+
+    pressure_series = []
+    plume_series    = []
+
+    for i in range(1, n_points + 1):
+        t_yr = i * max_t_yr / n_points
+        t_hr = t_yr * 365 * 24
+        pressure_series.append([round(t_yr, 3), round(pressure_at_time_mpa(t_hr, inputs, q_per_well_vol), 4)])
+        plume_series.append([round(t_yr, 3), round(_plume_radius_at_t(t_hr, inputs, q_per_well_vol), 2)])
+
+    return pressure_series, plume_series
 
 
 def classify_reservoir_screening(inputs, max_safe_years, plume_radius_m):
-    duration = inputs["project_duration"]
-    reservoir_radius = inputs["radius"]
-
-    if max_safe_years >= duration and plume_radius_m <= reservoir_radius:
+    pressure_ok = max_safe_years >= inputs["project_duration"]
+    plume_ok    = plume_radius_m <= inputs["radius"]
+    if pressure_ok and plume_ok:
         return "Feasible"
-
-    if max_safe_years > 0 and (max_safe_years < duration or plume_radius_m > reservoir_radius):
+    if max_safe_years >= 0.9 * inputs["project_duration"]:
         return "Conditional"
-
     return "Infeasible"
 
 
 def run_reservoir_model(inputs, q_total_kg_hr):
     n_wells = inputs["n_wells"]
-    rho = inputs.get("co2_density", 700)
+    rho     = inputs.get("co2_density", 700)
 
-    q_per_well_mass_kg_hr = q_total_kg_hr / n_wells
-    q_per_well_vol_m3_hr = q_per_well_mass_kg_hr / rho
+    q_per_well_vol = (q_total_kg_hr / n_wells) / rho
 
-    p_allow_mpa, p_frac_mpa = compute_allowable_pressure(inputs)
-    max_safe_years = find_max_safe_injection_time_years(inputs, q_per_well_vol_m3_hr, p_allow_mpa)
-    max_rate_kg_hr = compute_max_sustainable_rate_kg_hr(inputs, q_total_kg_hr, p_allow_mpa)
-    plume_radius_m = compute_plume_radius_m(inputs, q_per_well_vol_m3_hr)
+    p_allow_mpa, _ = compute_allowable_pressure(inputs)
+    max_safe_years  = find_max_safe_injection_time_years(inputs, q_per_well_vol, p_allow_mpa)
+    max_rate_kg_hr  = compute_max_sustainable_rate_kg_hr(inputs, q_total_kg_hr, p_allow_mpa)
+    plume_radius_m  = compute_plume_radius_m(inputs, q_per_well_vol)
 
-    t_final = inputs["project_duration"] * 365 * 24
-    if inputs["reservoir_type"].strip().lower() == "open":
-        final_pressure = pressure_open_mpa(t_final, inputs, q_per_well_vol_m3_hr)
-    else:
-        final_pressure = pressure_closed_mpa(t_final, inputs, q_per_well_vol_m3_hr)
+    t_final_hr     = inputs["project_duration"] * 365 * 24
+    final_pressure = pressure_at_time_mpa(t_final_hr, inputs, q_per_well_vol)
 
     status = classify_reservoir_screening(inputs, max_safe_years, plume_radius_m)
 
-    if status == "Feasible":
-        feasibility_message = "Reservoir can sustain the required CO2 rate for the full project duration without exceeding pressure limits."
-    elif status == "Conditional":
-        feasibility_message = "Reservoir can inject CO2, but one or more limits reduce confidence in sustaining the full project duration."
-    else:
-        feasibility_message = "Reservoir cannot safely sustain the required CO2 rate under the selected design conditions."
+    messages = {
+        "Feasible":    "Reservoir can sustain the required CO₂ rate for the full project duration without exceeding pressure limits.",
+        "Conditional": "Reservoir can inject CO₂, but one or more limits reduce confidence in sustaining the full project duration.",
+        "Infeasible":  "Reservoir cannot safely sustain the required CO₂ rate under the selected design conditions.",
+    }
+
+    pressure_series, plume_series = generate_time_series(inputs, q_per_well_vol, max_safe_years)
 
     return {
-        "status": status,
-        "feasibility_message": feasibility_message,
+        "status":                        status,
+        "feasibility_message":           messages[status],
         "max_safe_injection_time_years": round(max_safe_years, 2),
-        "final_pressure_mpa": round(final_pressure, 4),
-        "max_sustainable_rate_kg_hr": round(max_rate_kg_hr, 2),
-        "estimated_plume_radius_m": round(plume_radius_m, 2)
+        "final_pressure_mpa":            round(final_pressure, 4),
+        "max_sustainable_rate_kg_hr":    round(max_rate_kg_hr, 2),
+        "estimated_plume_radius_m":      round(plume_radius_m, 2),
+        "allowable_pressure_mpa":        round(p_allow_mpa, 4),
+        "reservoir_radius_m":            inputs["radius"],
+        "pressure_series":               pressure_series,
+        "plume_series":                  plume_series,
     }
 
 
@@ -460,7 +482,16 @@ def lambda_handler(event, context):
         if matched_result is None:
             return {
                 "statusCode": 404,
-                "body": json.dumps({"error": "No match found"})
+                "body": json.dumps({"error": f"No match found for selected_value={selected_value}"})
+            }
+
+        required_fields = ["ethylene_yield_percent", "furnace_reduction_percent",
+                           "cost_saving_percent", "hydrogen_purity_percent", "co2_rate"]
+        missing = [f for f in required_fields if matched_result.get(f) is None]
+        if missing:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": f"Result data incomplete for {selected_value}. Missing fields: {missing}"})
             }
 
         che_evaluation = build_che_evaluation(matched_result)

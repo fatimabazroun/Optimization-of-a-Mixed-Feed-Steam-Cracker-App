@@ -12,8 +12,9 @@ pip3 install reportlab \
   --only-binary=:all: \
   -t package/ --quiet
 
-echo ">>> Copying Lambda handler"
+echo ">>> Copying Lambda handler and assets"
 cp lambda_function.py package/
+cp logo.png package/
 
 echo ">>> Zipping"
 cd package

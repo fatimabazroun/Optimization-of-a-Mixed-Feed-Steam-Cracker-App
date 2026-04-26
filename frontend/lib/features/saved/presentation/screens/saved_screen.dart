@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/scenario_service.dart';
 import '../../../workspace/presentation/screens/simulation_results_screen.dart';
 
@@ -15,11 +17,20 @@ class _SavedScreenState extends State<SavedScreen> {
   final List<String> _filters = ['All', 'Optimal', 'Warning', 'Critical'];
   List<Map<String, dynamic>> _scenarios = [];
   bool _loading = true;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+    _searchCtrl.addListener(() => setState(() => _searchQuery = _searchCtrl.text));
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -33,8 +44,14 @@ class _SavedScreenState extends State<SavedScreen> {
   }
 
   List<Map<String, dynamic>> get _filtered {
-    if (_filter == 'All') return _scenarios;
-    return _scenarios.where((s) => s['status'] == _filter).toList();
+    var list = _filter == 'All'
+        ? _scenarios
+        : _scenarios.where((s) => s['status'] == _filter).toList();
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.trim().toLowerCase();
+      list = list.where((s) => (s['name'] as String? ?? '').toLowerCase().contains(q)).toList();
+    }
+    return list;
   }
 
   void _confirmDelete(Map<String, dynamic> s) {
@@ -146,8 +163,7 @@ class _SavedScreenState extends State<SavedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -155,114 +171,180 @@ class _SavedScreenState extends State<SavedScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 28),
-                const Text('Saved Scenarios', style: AppTextStyles.heading1),
-                const SizedBox(height: 6),
-                const Text('Review and manage your previous simulations',
-                    style: AppTextStyles.body),
-                const SizedBox(height: 20),
-
-                // Filter chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.filter_list, color: AppColors.textLight, size: 18),
-                      const SizedBox(width: 10),
-                      ..._filters.map((f) {
-                        final selected = _filter == f;
-                        final Color chipColor = switch (f) {
-                          'Optimal'  => const Color(0xFF2ECC71),
-                          'Warning'  => const Color(0xFFF39C12),
-                          'Critical' => const Color(0xFFE74C3C),
-                          _          => AppColors.cyan,
-                        };
-                        return GestureDetector(
-                          onTap: () => setState(() => _filter = f),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? chipColor.withValues(alpha: 0.15)
-                                  : Colors.white.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: selected
-                                    ? chipColor.withValues(alpha: 0.6)
-                                    : Colors.white.withValues(alpha: 0.8),
-                                width: 1.2,
-                              ),
-                              boxShadow: selected
-                                  ? [
-                                      BoxShadow(
-                                        color: chipColor.withValues(alpha: 0.25),
-                                        blurRadius: 12,
-                                        spreadRadius: 1,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ]
-                                  : [],
-                            ),
-                            child: Text(f,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: selected ? chipColor : AppColors.textMedium,
-                                )),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Saved Scenarios', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                          const SizedBox(height: 6),
+                          Text('Review and manage your previous simulations',
+                              style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    Image.asset(
+                      'assets/images/Transparent_logo.png',
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 12),
 
-                const SizedBox(height: 20),
-
-                // List
+                // List — search + filters scroll away with content (Apple standard)
                 Expanded(
                   child: _loading
                       ? const Center(
                           child: CircularProgressIndicator(
                               color: AppColors.cyan, strokeWidth: 2),
                         )
-                      : _filtered.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.bookmark_outline,
-                                      size: 64, color: AppColors.highlight),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _filter == 'All'
-                                        ? 'No saved scenarios yet'
-                                        : 'No $_filter scenarios',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textMedium,
+                      : CustomScrollView(
+                          physics: const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                          slivers: [
+                              // iOS-style pull-to-refresh
+                              CupertinoSliverRefreshControl(
+                                onRefresh: _load,
+                              ),
+
+                              // Search bar — scrolls away on scroll down
+                              SliverToBoxAdapter(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primaryBlue.withValues(alpha: 0.06),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextField(
+                                    controller: _searchCtrl,
+                                    style: const TextStyle(fontSize: 14, color: AppColors.darkBase),
+                                    decoration: InputDecoration(
+                                      hintText: 'Search scenarios…',
+                                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.textLight),
+                                      prefixIcon: const Icon(Icons.search, color: AppColors.textLight, size: 20),
+                                      suffixIcon: _searchQuery.isNotEmpty
+                                          ? GestureDetector(
+                                              onTap: () => _searchCtrl.clear(),
+                                              child: const Icon(Icons.close, color: AppColors.textLight, size: 18),
+                                            )
+                                          : null,
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                      'Run a simulation to save results here',
-                                      style: AppTextStyles.body),
-                                ],
+                                ),
                               ),
-                            )
-                          : RefreshIndicator(
-                              color: AppColors.cyan,
-                              onRefresh: _load,
-                              child: ListView.builder(
-                                itemCount: _filtered.length,
-                                itemBuilder: (context, i) {
-                                  final s = _filtered[i];
-                                  final realIndex = _scenarios.indexOf(s);
-                                  return _scenarioCard(s, realIndex);
-                                },
+
+                              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+
+                              // Filter chips — also scrolls away
+                              SliverToBoxAdapter(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.filter_list, color: AppColors.textLight, size: 18),
+                                      const SizedBox(width: 10),
+                                      ..._filters.map((f) {
+                                        final selected = _filter == f;
+                                        final Color chipColor = switch (f) {
+                                          'Optimal'  => const Color(0xFF2ECC71),
+                                          'Warning'  => const Color(0xFFF39C12),
+                                          'Critical' => const Color(0xFFE74C3C),
+                                          _          => AppColors.cyan,
+                                        };
+                                        return GestureDetector(
+                                          onTap: () => setState(() => _filter = f),
+                                          child: AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            margin: const EdgeInsets.only(right: 8),
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: selected
+                                                  ? chipColor.withValues(alpha: 0.15)
+                                                  : Colors.white.withValues(alpha: 0.6),
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: selected
+                                                    ? chipColor.withValues(alpha: 0.6)
+                                                    : Colors.white.withValues(alpha: 0.8),
+                                                width: 1.2,
+                                              ),
+                                              boxShadow: selected
+                                                  ? [BoxShadow(color: chipColor.withValues(alpha: 0.25), blurRadius: 12, spreadRadius: 1, offset: const Offset(0, 3))]
+                                                  : [],
+                                            ),
+                                            child: Text(f,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: selected ? chipColor : AppColors.textMedium,
+                                                )),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+
+                              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                              // Cards or empty state
+                              _filtered.isEmpty
+                                  ? SliverFillRemaining(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.bookmark_outline,
+                                              size: 64, color: AppColors.highlight),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            _searchQuery.isNotEmpty
+                                                ? 'No results for "$_searchQuery"'
+                                                : _filter == 'All'
+                                                    ? 'No saved scenarios yet'
+                                                    : 'No $_filter scenarios',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textMedium,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text('Run a simulation to save results here',
+                                              style: AppTextStyles.body),
+                                        ],
+                                      ),
+                                    )
+                                  : SliverList(
+                                      delegate: SliverChildBuilderDelegate(
+                                        (context, i) {
+                                          final s = _filtered[i];
+                                          final realIndex = _scenarios.indexOf(s);
+                                          return _scenarioCard(s, realIndex);
+                                        },
+                                        childCount: _filtered.length,
+                                      ),
+                                    ),
+                            ],
+                          ),
                 ),
               ],
             ),
@@ -382,7 +464,7 @@ class _SavedScreenState extends State<SavedScreen> {
             scenario:      scenarioData,
             temperature:   s['temperature'] as String,
             pressure:      s['pressure'] as String,
-            scenarioId:    s['scenarioId'] as String? ?? 'S1',
+            scenarioId:    s['scenarioType'] as String? ?? s['scenarioId'] as String? ?? 'S1',
             selectedValue: s['selectedValue'] ?? '',
             useReservoir:  s['useReservoir'] as bool? ?? false,
             cachedRawData: rawData,
@@ -472,6 +554,29 @@ class _SavedScreenState extends State<SavedScreen> {
     }
   }
 
+  String _reactionLabel(Map<String, dynamic> s) {
+    final scenarioId = s['scenarioType'] as String? ?? s['scenarioId'] as String? ?? 'S1';
+    final sel = s['selectedValue'];
+    if (sel == null) return '';
+    if (scenarioId == 'S1') {
+      final val = (sel is num) ? sel.toDouble() : double.tryParse(sel.toString()) ?? 0.0;
+      return 'Rxn 1 — conv. ${(val * 100).toStringAsFixed(0)}%';
+    }
+    final parts = sel.toString().split('-');
+    if (scenarioId == 'S2' && parts.length >= 2) {
+      final v1 = (double.tryParse(parts[0]) ?? 0) * 100;
+      final v2 = (double.tryParse(parts[1]) ?? 0) * 100;
+      return 'Rxn 1 & 2 — ${v1.toStringAsFixed(0)}%, ${v2.toStringAsFixed(0)}%';
+    }
+    if (scenarioId == 'S3' && parts.length >= 3) {
+      final v1 = (double.tryParse(parts[0]) ?? 0) * 100;
+      final v2 = (double.tryParse(parts[1]) ?? 0) * 100;
+      final v3 = (double.tryParse(parts[2]) ?? 0) * 100;
+      return 'Rxn 1, 2 & 3 — ${v1.toStringAsFixed(0)}%, ${v2.toStringAsFixed(0)}%, ${v3.toStringAsFixed(0)}%';
+    }
+    return '';
+  }
+
   Widget _scenarioCard(Map<String, dynamic> s, int index) {
     final status = s['status'] as String;
     Color statusColor;
@@ -496,15 +601,9 @@ class _SavedScreenState extends State<SavedScreen> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryBlue.withValues(alpha: 0.07),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: context.cardShadow, blurRadius: 16, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,11 +613,7 @@ class _SavedScreenState extends State<SavedScreen> {
             children: [
               Expanded(
                 child: Text(s['name'],
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.darkBase,
-                    )),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
               ),
               GestureDetector(
                 onTap: () => _confirmDelete(s),
@@ -537,10 +632,9 @@ class _SavedScreenState extends State<SavedScreen> {
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.textLight),
+              Icon(Icons.calendar_today_outlined, size: 12, color: context.textTertiary),
               const SizedBox(width: 4),
-              Text(s['date'],
-                  style: const TextStyle(fontSize: 12, color: AppColors.textLight)),
+              Flexible(child: Text(s['date'], style: TextStyle(fontSize: 12, color: context.textTertiary))),
             ],
           ),
           const SizedBox(height: 10),
@@ -566,8 +660,7 @@ class _SavedScreenState extends State<SavedScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(s['simId'],
-                  style: const TextStyle(fontSize: 11, color: AppColors.textLight)),
+              Flexible(child: Text(s['simId'], style: TextStyle(fontSize: 11, color: context.textTertiary))),
             ],
           ),
           const SizedBox(height: 12),
@@ -577,14 +670,8 @@ class _SavedScreenState extends State<SavedScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Temperature',
-                        style: TextStyle(fontSize: 11, color: AppColors.textLight)),
-                    Text('${s['temperature']}°C',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.darkBase,
-                        )),
+                    Text('Temperature', style: TextStyle(fontSize: 11, color: context.textTertiary)),
+                    Text('${s['temperature']}°C', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   ],
                 ),
               ),
@@ -592,14 +679,8 @@ class _SavedScreenState extends State<SavedScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Pressure',
-                        style: TextStyle(fontSize: 11, color: AppColors.textLight)),
-                    Text('${s['pressure']} bar',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.darkBase,
-                        )),
+                    Text('Pressure', style: TextStyle(fontSize: 11, color: context.textTertiary)),
+                    Text('${s['pressure']} bar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   ],
                 ),
               ),
@@ -607,10 +688,22 @@ class _SavedScreenState extends State<SavedScreen> {
           ),
           const SizedBox(height: 10),
           Row(
+            children: [
+              const Icon(Icons.science_outlined, size: 12, color: AppColors.textLight),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  _reactionLabel(s),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMedium),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(s['scenario'],
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMedium)),
+              Text(s['scenario'], style: TextStyle(fontSize: 12, color: context.textSecondary)),
               const Icon(Icons.arrow_forward, size: 16, color: AppColors.cyan),
             ],
           ),

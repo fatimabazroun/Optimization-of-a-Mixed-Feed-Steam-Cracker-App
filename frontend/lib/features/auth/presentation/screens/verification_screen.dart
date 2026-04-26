@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import 'welcome_screen.dart';
@@ -64,11 +65,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
       setState(() => _hasError = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
               Icon(Icons.warning_amber_outlined, color: Colors.white, size: 18),
               SizedBox(width: 8),
-              Text('Please enter the complete 6-digit code'),
+              Expanded(child: Text('Please enter the complete 6-digit code')),
             ],
           ),
           backgroundColor: Colors.red.shade400,
@@ -129,7 +130,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Code resent successfully'),
+          content: Text('Code resent successfully'),
           backgroundColor: AppColors.cyan,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -156,8 +157,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -166,11 +166,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                      Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
                       SizedBox(width: 4),
-                      Text('Back', style: AppTextStyles.body),
+                      Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                     ],
                   ),
                 ),
@@ -183,7 +183,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       Container(
                         width: 72, height: 72,
                         decoration: BoxDecoration(
-                          color: AppColors.cyan.withOpacity(0.12),
+                          color: AppColors.cyan.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.mark_email_unread_outlined,
@@ -191,16 +191,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      const Text('Enter Verification\nCode',
+                      Text('Enter Verification\nCode',
                           textAlign: TextAlign.center,
-                          style: AppTextStyles.heading2),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
                       const SizedBox(height: 12),
                       Text(
                         "We've sent a 6-digit code to\n${widget.email}",
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textMedium,
+                          color: context.textSecondary,
                           height: 1.5,
                         ),
                       ),
@@ -243,7 +243,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               style: TextStyle(
                                 fontSize: boxSize * 0.42,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.darkBase,
+                                color: context.textPrimary,
                               ),
                               decoration: const InputDecoration(
                                 counterText: '',
@@ -262,7 +262,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
                       if (_hasError) ...[
                         const SizedBox(height: 12),
-                        const Text('Please fill in all 6 digits',
+                        Text('Please fill in all 6 digits',
                             style: TextStyle(fontSize: 12, color: Colors.red)),
                       ],
 
@@ -273,10 +273,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.inputBorder),
+                            border: Border.all(color: context.inputBorder),
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: const Text('Resend Code', style: AppTextStyles.body),
+                          child: Text('Resend Code', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                         ),
                       ),
 

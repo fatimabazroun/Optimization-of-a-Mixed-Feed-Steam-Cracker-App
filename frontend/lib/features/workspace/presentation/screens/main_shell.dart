@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/scenario_service.dart';
 import '../../../saved/presentation/screens/saved_screen.dart';
 import 'workspace_screen.dart';
 import '../../../account/presentation/screens/account_screen.dart';
@@ -12,6 +13,7 @@ class _NavItem extends StatelessWidget {
   final int index;
   final int current;
   final ValueChanged<int> onTap;
+  final int badgeCount;
 
   const _NavItem({
     required this.icon,
@@ -20,6 +22,7 @@ class _NavItem extends StatelessWidget {
     required this.index,
     required this.current,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   @override
@@ -38,10 +41,35 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              selected ? activeIcon : icon,
-              size: 22,
-              color: selected ? AppColors.cyan : const Color(0xFFADB5BD),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  selected ? activeIcon : icon,
+                  size: 22,
+                  color: selected ? AppColors.cyan : const Color(0xFFADB5BD),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -5,
+                    right: -8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$badgeCount',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
@@ -69,11 +97,18 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
+  int _savedCount = 0;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _loadCount();
+  }
+
+  Future<void> _loadCount() async {
+    final list = await ScenarioService.loadScenarios();
+    if (mounted) setState(() => _savedCount = list.length);
   }
 
   final List<Widget> _screens = const [
@@ -85,7 +120,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true, // content goes behind nav bar
+      extendBody: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: KeyedSubtree(
@@ -102,10 +137,10 @@ class _MainShellState extends State<MainShell> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.75),
+                color: context.navBarBg,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: context.navBarBorder,
                   width: 1.2,
                 ),
                 boxShadow: [
@@ -119,8 +154,8 @@ class _MainShellState extends State<MainShell> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _NavItem(icon: Icons.bookmark_outline, activeIcon: Icons.bookmark, label: 'Saved',    index: 0, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
-                  _NavItem(icon: Icons.home_outlined,    activeIcon: Icons.home_rounded,  label: 'Workspace', index: 1, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
+                  _NavItem(icon: Icons.bookmark_outline, activeIcon: Icons.bookmark,       label: 'Saved',     index: 0, current: _currentIndex, badgeCount: _savedCount, onTap: (i) { setState(() => _currentIndex = i); _loadCount(); }),
+                  _NavItem(icon: Icons.home_outlined,    activeIcon: Icons.home_rounded,   label: 'Workspace', index: 1, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
                   _NavItem(icon: Icons.person_outline,   activeIcon: Icons.person_rounded, label: 'Account',   index: 2, current: _currentIndex, onTap: (i) => setState(() => _currentIndex = i)),
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../workspace/presentation/screens/main_shell.dart';
@@ -73,7 +74,6 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) _buttonController.forward();
     });
 
-    // Check if user is already signed in after animation starts
     _checkAuthSession();
   }
 
@@ -117,8 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -137,7 +136,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                   child: Image.asset(
-                    'assets/images/logo.png',
+                    'assets/images/Transparent_logo.png',
                     width: 130,
                     height: 130,
                     fit: BoxFit.contain,
@@ -150,21 +149,15 @@ class _SplashScreenState extends State<SplashScreen>
                   opacity: _textFade,
                   child: SlideTransition(
                     position: _textSlide,
-                    child: const Column(
+                    child: Builder(builder: (context) => Column(
                       children: [
-                        Text(
-                          'Welcome\nto CrackerIQ',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.heading1,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'Your journey begins here',
-                          style: AppTextStyles.body,
-                          textAlign: TextAlign.center,
-                        ),
+                        Text('Welcome\nto CrackerIQ', textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                        const SizedBox(height: 12),
+                        Text('Your journey begins here — optimize smarter, where engineering meets intelligence.',
+                            style: TextStyle(fontSize: 14, color: context.textSecondary), textAlign: TextAlign.center),
                       ],
-                    ),
+                    )),
                   ),
                 ),
 
@@ -187,8 +180,8 @@ class _SplashScreenState extends State<SplashScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text('Already have an account? ',
-                                style: AppTextStyles.body),
+                            Flexible(child: Text('Already have an account? ',
+                                style: TextStyle(fontSize: 14, color: context.textSecondary))),
                             GestureDetector(
                               onTap: () => _navigateTo(const LoginScreen()),
                               child: const Text('Log In', style: AppTextStyles.link),

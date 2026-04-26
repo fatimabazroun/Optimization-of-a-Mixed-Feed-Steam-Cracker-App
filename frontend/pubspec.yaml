@@ -1,7 +1,7 @@
 name: steam_cracker_app
 description: Mixed-Feed Steam Cracker Decision-Support Application
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+20260427
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -12,12 +12,14 @@ dependencies:
   flutter_riverpod: ^2.5.1
   google_fonts: ^6.2.1
   equatable: ^2.0.5
-  amplify_flutter: ^2.3.0
-  amplify_auth_cognito: ^2.3.0
+  amplify_flutter: '>=2.6.0 <3.0.0'
+  amplify_auth_cognito: '>=2.6.0 <3.0.0'
   shared_preferences: ^2.3.2
   http: ^1.2.1
   flutter_dotenv: ^5.1.0
   printing: ^5.13.1
+  package_info_plus: ^8.0.0
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:

@@ -4,11 +4,15 @@ import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'amplifyconfiguration.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
+
+final themeProvider = ThemeProvider();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
+  await themeProvider.init();
   await _configureAmplify();
   runApp(const CrackerIQApp());
 }
@@ -27,11 +31,16 @@ class CrackerIQApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CrackerIQ',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
-      home: const SplashScreen(),
+    return ListenableBuilder(
+      listenable: themeProvider,
+      builder: (_, __) => MaterialApp(
+        title: 'CrackerIQ',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeProvider.mode,
+        home: const SplashScreen(),
+      ),
     );
   }
 }

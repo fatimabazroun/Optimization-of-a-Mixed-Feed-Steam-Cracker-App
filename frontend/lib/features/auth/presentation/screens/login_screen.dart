@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -86,8 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -101,19 +101,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
-                        SizedBox(width: 4),
-                        Text('Back', style: AppTextStyles.body),
+                        Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
+                        const SizedBox(width: 4),
+                        Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 32),
-                  const Text('Welcome Back', style: AppTextStyles.heading2),
+                  Text('Welcome Back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   const SizedBox(height: 6),
-                  const Text('Log in to continue your journey', style: AppTextStyles.body),
+                  Text('Log in to continue your journey', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                   const SizedBox(height: 36),
 
                   AppTextField(
@@ -165,14 +165,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(child: Divider(color: AppColors.inputBorder)),
+                      Expanded(child: Divider(color: context.inputBorder)),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('or', style: TextStyle(color: AppColors.textLight, fontSize: 13)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('or', style: TextStyle(color: context.textTertiary, fontSize: 13)),
                       ),
-                      Expanded(child: Divider(color: AppColors.inputBorder)),
+                      Expanded(child: Divider(color: context.inputBorder)),
                     ],
                   ),
 
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account? ", style: AppTextStyles.body),
+                      Flexible(child: Text("Don't have an account? ", style: TextStyle(fontSize: 14, color: context.textSecondary))),
                       GestureDetector(
                         onTap: () => Navigator.pushReplacement(
                           context,

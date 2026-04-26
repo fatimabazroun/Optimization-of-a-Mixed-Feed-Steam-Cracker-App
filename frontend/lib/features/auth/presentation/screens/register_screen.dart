@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -75,8 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -90,19 +90,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                        Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
                         SizedBox(width: 4),
-                        Text('Back', style: AppTextStyles.body),
+                        Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 32),
-                  const Text('Create Account', style: AppTextStyles.heading2),
+                  Text('Create Account', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   const SizedBox(height: 6),
-                  const Text('Begin your journey to CrackerIQ', style: AppTextStyles.body),
+                  Text('Begin your journey to CrackerIQ', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                   const SizedBox(height: 32),
 
                   AppTextField(
@@ -164,17 +164,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  const Text(
+                  Text(
                     'By continuing, you agree to our Terms of Service and Privacy Policy',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: AppColors.textLight),
+                    style: TextStyle(fontSize: 11, color: context.textTertiary),
                   ),
 
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Already have an account? ', style: AppTextStyles.body),
+                      Flexible(child: Text('Already have an account? ', style: TextStyle(fontSize: 14, color: context.textSecondary))),
                       GestureDetector(
                         onTap: () => Navigator.pushReplacement(
                           context,
@@ -185,7 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             transitionDuration: const Duration(milliseconds: 300),
                           ),
                         ),
-                        child: const Text('Log In', style: AppTextStyles.link),
+                        child: Text('Log In', style: AppTextStyles.link),
                       ),
                     ],
                   ),

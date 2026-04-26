@@ -13,6 +13,7 @@ class ReportService {
     required dynamic selectedValue,
     required bool useReservoir,
     required Map<String, dynamic> results,
+    Map<String, dynamic>? reservoir,
   }) async {
     final payload = {
       'scenario':      scenario,
@@ -22,6 +23,7 @@ class ReportService {
       'selectedValue': selectedValue,
       'use_reservoir': useReservoir,
       'results':       _sanitize(results),
+      if (reservoir != null) 'reservoir': reservoir,
     };
 
     final response = await http

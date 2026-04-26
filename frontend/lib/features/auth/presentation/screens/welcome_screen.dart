@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../workspace/presentation/screens/main_shell.dart';
@@ -50,8 +51,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnim,
@@ -63,43 +63,28 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   const Spacer(),
                   ScaleTransition(
                     scale: _scaleAnim,
-                    child: Container(
-                      width: 140,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        gradient: AppColors.tealGradient,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.cyan.withOpacity(0.4),
-                            blurRadius: 28,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.science_rounded,
-                          size: 72, color: Colors.white),
+                    child: const Image(
+                      image: AssetImage('assets/images/Transparent_logo.png'),
+                      width: 160,
+                      height: 160,
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 40),
                   Text(
                     _firstName.isNotEmpty ? 'Hi, $_firstName!' : 'Hi there!',
-                    style: AppTextStyles.heading1,
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: context.textPrimary),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text('Welcome to CrackerIQ',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.midTone,
-                      ),
+                  Text('Welcome to CrackerIQ',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.cyan),
                       textAlign: TextAlign.center),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Explore steam cracking scenarios, compare KPIs, and make data-driven decisions.',
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.body,
+                    style: TextStyle(fontSize: 15, color: context.textSecondary, height: 1.5),
                   ),
                   const Spacer(),
                   GradientButton(

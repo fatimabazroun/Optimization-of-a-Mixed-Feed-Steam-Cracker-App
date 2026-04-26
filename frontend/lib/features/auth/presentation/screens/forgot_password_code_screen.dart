@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import 'forgot_password_new_screen.dart';
@@ -109,8 +110,7 @@ class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -119,11 +119,11 @@ class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                      Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
                       SizedBox(width: 4),
-                      Text('Back', style: AppTextStyles.body),
+                      Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                     ],
                   ),
                 ),
@@ -142,18 +142,18 @@ class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
                             color: AppColors.cyan, size: 36),
                       ),
                       const SizedBox(height: 24),
-                      const Text(
+                      Text(
                         'Enter Verification\nCode',
                         textAlign: TextAlign.center,
-                        style: AppTextStyles.heading2,
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         "We've sent a 6-digit code to\n${widget.email}",
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textMedium,
+                          color: context.textSecondary,
                           height: 1.5,
                         ),
                       ),
@@ -194,7 +194,7 @@ class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
                               style: TextStyle(
                                 fontSize: boxSize * 0.42,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.darkBase,
+                                color: context.textPrimary,
                               ),
                               decoration: const InputDecoration(
                                 counterText: '',
@@ -218,22 +218,22 @@ class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
                           children: [
                             const Icon(Icons.error_outline, size: 15, color: Colors.red),
                             const SizedBox(width: 5),
-                            Text(
+                            Flexible(child: Text(
                               _errorMessage!,
-                              style: const TextStyle(fontSize: 13, color: Colors.red),
-                            ),
+                              style: TextStyle(fontSize: 13, color: Colors.red),
+                            )),
                           ],
                         )
                       else if (_resendSent)
-                        const Row(
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.check_circle_outline, size: 15, color: AppColors.cyan),
                             SizedBox(width: 5),
-                            Text(
+                            Flexible(child: Text(
                               'Code resent successfully',
                               style: TextStyle(fontSize: 13, color: AppColors.cyan),
-                            ),
+                            )),
                           ],
                         )
                       else
@@ -245,12 +245,12 @@ class _ForgotPasswordCodeScreenState extends State<ForgotPasswordCodeScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.inputBorder),
+                            border: Border.all(color: context.inputBorder),
                             borderRadius: BorderRadius.circular(30),
                           ),
                           child: Text(
                             _loading ? 'Resending…' : 'Resend Code',
-                            style: AppTextStyles.body,
+                            style: TextStyle(fontSize: 14, color: context.textSecondary),
                           ),
                         ),
                       ),

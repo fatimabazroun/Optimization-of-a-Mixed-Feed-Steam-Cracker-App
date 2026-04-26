@@ -1,6 +1,8 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
+import '../../../../shared/widgets/field_info_tooltip.dart';
 import 'simulation_results_screen.dart';
 
 class ConfigureSimulationScreen extends StatefulWidget {
@@ -20,7 +22,6 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
   // Non-Ethane state only
   String? _selectedTemp;
   final _pressureController = TextEditingController();
-  String _validPhase = 'Vapor-Only';
 
   // Rxn 1 dropdown (Ethane only)
   double _selectedRxn1 = 0.70;
@@ -89,12 +90,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline,
+                Icon(Icons.error_outline,
                     color: Color(0xFFE74C3C), size: 18),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(msg,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: Colors.white,
                           fontSize: 13,
                           fontWeight: FontWeight.w500)),
@@ -214,6 +215,8 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
         'well_radius': parse(_wellboreRadiusCtrl)!,
       if (_skinFactorCtrl.text.trim().isNotEmpty)
         'skin': parse(_skinFactorCtrl)!,
+      if (_co2SaturationCtrl.text.trim().isNotEmpty)
+        'co2_saturation': parse(_co2SaturationCtrl)!,
       if (_logStartTimeCtrl.text.trim().isNotEmpty)
         'log_start_time': parse(_logStartTimeCtrl)!,
       if (_reservoirType == 'Closed' && _closedMultCtrl.text.trim().isNotEmpty)
@@ -243,6 +246,17 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     [0.80, 0.05, 0.03],
   ];
   int _selectedTripletIndex = 0;
+
+  static const _rxnDescriptions = <int, String>{
+    1: 'Primary cracking of ethane to hydrogen and ethylene. This is the main target reaction — higher conversion directly increases ethylene yield.',
+    2: 'Secondary ethane reaction producing propane and methane as byproducts. Competes with Rxn 1 and reduces ethylene selectivity.',
+    3: 'Propane cracking to propylene and hydrogen. Beneficial side reaction that produces valuable propylene.',
+    4: 'Propane cracking to methane and ethylene. Competes with Rxn 3 for propane consumption.',
+    5: 'Propylene decomposition to acetylene and methane. Undesirable reaction that reduces propylene yield.',
+    6: 'Condensation of ethylene and acetylene to form cyclobutadiene. An undesired secondary product.',
+    7: 'Ethane coupling producing methane and ethylene. Minor side reaction competing with primary cracking.',
+    8: 'Reaction between ethane and ethylene forming methane and propylene. Reduces net ethylene yield.',
+  };
 
   final List<Map<String, dynamic>> _reactions = [
     {
@@ -318,10 +332,33 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
   final _totalCompCtrl = TextEditingController();
   final _wellboreRadiusCtrl = TextEditingController();
   final _skinFactorCtrl = TextEditingController();
+  final _co2SaturationCtrl = TextEditingController();
   final _closedMultCtrl = TextEditingController();
   final _logStartTimeCtrl = TextEditingController();
 
   final Set<String> _errorFields = {};
+  final Map<String, String> _liveRangeErrors = {};
+
+  static const _fieldRanges = <String, (double, double)>{
+    'proj_duration':  (1,      50),
+    'n_wells':        (1,      10),
+    'depth':          (800,    3000),
+    'init_pressure':  (5,      50),
+    'permeability':   (0.1,    1000),
+    'thickness':      (5,      100),
+    'porosity':       (0.05,   0.4),
+    'res_radius':     (500,    10000),
+    'frac_gradient':  (0.015,  0.025),
+    'safety_margin':  (1,      5),
+    'co2_density':    (500,    900),
+    'co2_viscosity':  (0.03,   0.1),
+    'co2_saturation': (0.05,   0.6),
+    'total_comp':     (1e-5,   1e-3),
+    'well_radius':    (0.05,   0.3),
+    'skin_factor':    (-5,     20),
+    'closed_mult':    (1,      5),
+    'log_start_time': (0.1,    10),
+  };
 
   void _clearFieldError(String key) {
     if (_errorFields.contains(key)) setState(() => _errorFields.remove(key));
@@ -343,33 +380,51 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     _totalCompCtrl.text = '0.0001';
     _wellboreRadiusCtrl.text = '0.1';
     _skinFactorCtrl.text = '0';
+    _co2SaturationCtrl.text = '0.2';
     _closedMultCtrl.text = '3';
     _logStartTimeCtrl.text = '1';
 
-    // Clear error highlights as user edits each field
+    // Wire error-clear + live range validation for every PETE field
     final fieldListeners = <TextEditingController, String>{
-      _projDurationCtrl: 'proj_duration',
-      _numWellsCtrl: 'n_wells',
-      _depthCtrl: 'depth',
-      _initPressureCtrl: 'init_pressure',
-      _permeabilityCtrl: 'permeability',
-      _thicknessCtrl: 'thickness',
-      _porosityCtrl: 'porosity',
+      _projDurationCtrl:    'proj_duration',
+      _numWellsCtrl:        'n_wells',
+      _depthCtrl:           'depth',
+      _initPressureCtrl:    'init_pressure',
+      _permeabilityCtrl:    'permeability',
+      _thicknessCtrl:       'thickness',
+      _porosityCtrl:        'porosity',
       _reservoirRadiusCtrl: 'res_radius',
-      _fracPressureCtrl: 'frac_pressure',
-      _fracGradientCtrl: 'frac_gradient',
-      _safetyMarginCtrl: 'safety_margin',
-      _co2DensityCtrl: 'co2_density',
-      _co2ViscosityCtrl: 'co2_viscosity',
-      _totalCompCtrl: 'total_comp',
-      _wellboreRadiusCtrl: 'well_radius',
-      _skinFactorCtrl: 'skin_factor',
-      _closedMultCtrl: 'closed_mult',
-      _logStartTimeCtrl: 'log_start_time',
+      _fracPressureCtrl:    'frac_pressure',
+      _fracGradientCtrl:    'frac_gradient',
+      _safetyMarginCtrl:    'safety_margin',
+      _co2DensityCtrl:      'co2_density',
+      _co2ViscosityCtrl:    'co2_viscosity',
+      _totalCompCtrl:       'total_comp',
+      _wellboreRadiusCtrl:  'well_radius',
+      _skinFactorCtrl:      'skin_factor',
+      _co2SaturationCtrl:   'co2_saturation',
+      _closedMultCtrl:      'closed_mult',
+      _logStartTimeCtrl:    'log_start_time',
     };
     for (final e in fieldListeners.entries) {
       final key = e.value;
-      e.key.addListener(() => _clearFieldError(key));
+      final range = _fieldRanges[key];
+      e.key.addListener(() {
+        setState(() {
+          _errorFields.remove(key);
+          final text = e.key.text.trim();
+          if (range != null && text.isNotEmpty) {
+            final v = double.tryParse(text);
+            if (v != null && (v < range.$1 || v > range.$2)) {
+              _liveRangeErrors[key] = '${range.$1} – ${range.$2}';
+            } else {
+              _liveRangeErrors.remove(key);
+            }
+          } else {
+            _liveRangeErrors.remove(key);
+          }
+        });
+      });
     }
     // frac either/or: editing either one clears both highlights
     _fracPressureCtrl.addListener(() => _clearFieldError('frac_gradient'));
@@ -396,6 +451,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     _totalCompCtrl.dispose();
     _wellboreRadiusCtrl.dispose();
     _skinFactorCtrl.dispose();
+    _co2SaturationCtrl.dispose();
     _closedMultCtrl.dispose();
     _logStartTimeCtrl.dispose();
     super.dispose();
@@ -406,8 +462,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     final Color accentColor = widget.scenario['color'] as Color;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fade,
@@ -419,12 +474,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(
+                    child: Row(
                       children: [
                         Icon(Icons.arrow_back_ios,
-                            size: 16, color: AppColors.textMedium),
+                            size: 16, color: context.textSecondary),
                         SizedBox(width: 4),
-                        Text('Back to Overview', style: AppTextStyles.body),
+                        Text('Back to Overview', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
@@ -436,26 +491,27 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Configure Simulation',
-                            style: AppTextStyles.heading1),
-                        const SizedBox(height: 6),
-                        const Text('Set input parameters for the simulation',
-                            style: AppTextStyles.body),
-                        const SizedBox(height: 28),
+                        Text('Configure Simulation',
+                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                        SizedBox(height: 6),
+                        Text('Set input parameters for the simulation',
+                            style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                        SizedBox(height: 28),
 
                         // ── Operating Conditions ──
                         _sectionTitle('Operating Conditions'),
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14),
                         _sectionCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Temperature
-                              const Text('Temperature (°C)',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textLight)),
-                              const SizedBox(height: 10),
+                              Row(children: [
+                                Text('Temperature (°C)',
+                                    style: TextStyle(fontSize: 12, color: context.textTertiary)),
+                                FieldInfoTooltip(description: 'Cracking furnace temperature. Fixed at 850°C — the validated standard operating condition for this simulation model.'),
+                              ]),
+                              SizedBox(height: 10),
                               _hasLockedConditions
                                   ? _lockedField('850°C', accentColor)
                                   : SingleChildScrollView(
@@ -569,14 +625,15 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                       ),
                                     ),
 
-                              const SizedBox(height: 20),
+                              SizedBox(height: 20),
 
                               // Pressure
-                              const Text('Pressure (bar)',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textLight)),
-                              const SizedBox(height: 8),
+                              Row(children: [
+                                Text('Pressure (bar)',
+                                    style: TextStyle(fontSize: 12, color: context.textTertiary)),
+                                FieldInfoTooltip(description: 'Operating pressure in the cracking furnace. Fixed at 1.5 bar — this is the validated standard condition for this simulation model.'),
+                              ]),
+                              SizedBox(height: 8),
                               _hasLockedConditions
                                   ? _lockedField('1.5 bar', accentColor)
                                   : Row(
@@ -675,7 +732,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        SizedBox(width: 10),
                                         ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(14),
@@ -717,59 +774,37 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                       ],
                                     ),
 
-                              const SizedBox(height: 20),
+                              SizedBox(height: 20),
 
                               // Valid phases
-                              const Text('Valid Phases',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textLight)),
-                              const SizedBox(height: 8),
-                              _glassDropdownShell(
-                                accentColor: accentColor,
-                                isExpanded: true,
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _validPhase,
-                                    isExpanded: true,
-                                    dropdownColor: const Color(0xFFF0F4FF)
-                                        .withValues(alpha: 0.97),
-                                    icon: Icon(Icons.keyboard_arrow_down,
-                                        color: accentColor, size: 18),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: accentColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    items: [
-                                      'Vapor-Only',
-                                      'Liquid-Only',
-                                      'Vapor-Liquid'
-                                    ]
-                                        .map((item) => DropdownMenuItem(
-                                              value: item,
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 4),
-                                                child: Text(item),
-                                              ),
-                                            ))
-                                        .toList(),
-                                    onChanged: (val) =>
-                                        setState(() => _validPhase = val!),
-                                  ),
+                              Row(children: [
+                                Text('Valid Phases',
+                                    style: TextStyle(fontSize: 12, color: context.textTertiary)),
+                                FieldInfoTooltip(description: 'Phase state allowed in the reactor. Set to Vapor-Only because steam cracking operates entirely in the gas phase — liquid feed is vaporised before entering the furnace.'),
+                              ]),
+                              SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: accentColor.withValues(alpha: 0.25), width: 1.2),
+                                ),
+                                child: Text(
+                                  'Vapor-Only',
+                                  style: TextStyle(fontSize: 14, color: accentColor, fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ],
                           ),
                         ),
 
-                        const SizedBox(height: 28),
+                        SizedBox(height: 28),
 
                         // ── Reactions ──
                         _sectionTitle('Reactions'),
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14),
 
                         _sectionCard(
                           child: Column(
@@ -798,14 +833,14 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                         children: [
                                           _rxnBadge(
                                               r['rxn'] as int, accentColor),
-                                          const SizedBox(width: 10),
+                                          SizedBox(width: 10),
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(r['component'] as String,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                         fontSize: 12,
                                                         fontWeight:
                                                             FontWeight.w600,
@@ -814,13 +849,16 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                                 Text(
                                                     r['stoichiometry']
                                                         as String,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                         fontSize: 10,
                                                         color: AppColors
                                                             .textLight)),
                                               ],
                                             ),
                                           ),
+                                          if (_rxnDescriptions.containsKey(r['rxn'] as int))
+                                            FieldInfoTooltip(description: _rxnDescriptions[r['rxn'] as int]!),
+                                          SizedBox(width: 6),
                                           _hasLockedConditions
                                               ? _readOnlyFraction(
                                                   (_isScenario3 &&
@@ -913,10 +951,10 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                         ],
                                       ),
                                     if (!isLast)
-                                      const Padding(
+                                      Padding(
                                         padding: EdgeInsets.only(top: 12),
                                         child: Divider(
-                                            color: AppColors.inputBorder,
+                                            color: context.inputBorder,
                                             height: 1),
                                       ),
                                   ],
@@ -926,18 +964,18 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32),
 
                         // ── PETE — CO₂ Storage Assessment ──
                         _peteSectionHeader(accentColor),
-                        const SizedBox(height: 14),
+                        SizedBox(height: 14),
 
                         // Yes / No toggle — controls entire PETE section
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.surface,
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
@@ -949,26 +987,26 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                           ),
                           child: Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
                                     'Do you have reservoir information?',
                                     style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.darkBase)),
+                                        color: context.textPrimary)),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                               _yesNoToggle(accentColor),
                             ],
                           ),
                         ),
 
                         if (_hasReservoirInfo) ...[
-                          const SizedBox(height: 18),
+                          SizedBox(height: 18),
 
                           // A. Project Inputs
                           _peteSubHeader('A', 'Project Inputs', accentColor),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           _sectionCard(
                             child: Column(
                               children: [
@@ -977,24 +1015,26 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     unit: 'years',
                                     controller: _projDurationCtrl,
                                     accentColor: accentColor,
-                                    fieldKey: 'proj_duration'),
-                                const SizedBox(height: 14),
+                                    fieldKey: 'proj_duration',
+                                    description: '1 – 50 years. Total planned CO₂ injection period. Determines how long pressure and plume radius are simulated.'),
+                                SizedBox(height: 14),
                                 _peteField(
                                     label: 'Number of wells (N_w)',
                                     unit: '–',
                                     controller: _numWellsCtrl,
                                     accentColor: accentColor,
                                     fieldKey: 'n_wells',
-                                    keyboardType: TextInputType.number),
+                                    keyboardType: TextInputType.number,
+                                    description: '1 – 10. Total injection wells. CO₂ flow rate is split equally across all wells.'),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
 
                           // B. Reservoir Inputs
                           _peteSubHeader('B', 'Reservoir Inputs', accentColor),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           _sectionCard(
                             child: Column(
                               children: [
@@ -1006,18 +1046,20 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: 'm',
                                             controller: _depthCtrl,
                                             accentColor: accentColor,
-                                            fieldKey: 'depth')),
-                                    const SizedBox(width: 12),
+                                            fieldKey: 'depth',
+                                            description: '800 – 3000 m. Vertical depth to the reservoir. Deeper reservoirs generally have higher pressures and better containment.')),
+                                    SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Initial pressure (P_i)',
                                             unit: 'MPa',
                                             controller: _initPressureCtrl,
                                             accentColor: accentColor,
-                                            fieldKey: 'init_pressure')),
+                                            fieldKey: 'init_pressure',
+                                            description: '5 – 50 MPa. Reservoir pressure before CO₂ injection begins. Used as the baseline for pressure build-up calculations.')),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 Row(
                                   children: [
                                     Expanded(
@@ -1026,18 +1068,20 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             unit: 'mD',
                                             controller: _permeabilityCtrl,
                                             accentColor: accentColor,
-                                            fieldKey: 'permeability')),
-                                    const SizedBox(width: 12),
+                                            fieldKey: 'permeability',
+                                            description: '0.1 – 1000 mD. Rock\'s ability to allow fluid flow. Higher permeability means CO₂ spreads more easily and pressure builds more slowly.')),
+                                    SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Thickness (h)',
                                             unit: 'm',
                                             controller: _thicknessCtrl,
                                             accentColor: accentColor,
-                                            fieldKey: 'thickness')),
+                                            fieldKey: 'thickness',
+                                            description: '5 – 100 m. Net pay thickness of the injection zone. Thicker zones can store more CO₂ at lower pressure.')),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 Row(
                                   children: [
                                     Expanded(
@@ -1047,33 +1091,35 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             controller: _porosityCtrl,
                                             accentColor: accentColor,
                                             fieldKey: 'porosity',
-                                            hint: '0 – 1')),
-                                    const SizedBox(width: 12),
+                                            hint: '0 – 1',
+                                            description: '0.05 – 0.4. Fraction of rock volume that is pore space. Higher porosity means greater storage capacity.')),
+                                    SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Reservoir radius (r_e)',
                                             unit: 'm',
                                             controller: _reservoirRadiusCtrl,
                                             accentColor: accentColor,
-                                            fieldKey: 'res_radius')),
+                                            fieldKey: 'res_radius',
+                                            description: '500 – 10000 m. Outer boundary radius of the reservoir. Used to determine whether the CO₂ plume stays within safe limits.')),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        const Text('Reservoir type',
+                                        Text('Reservoir type',
                                             style: TextStyle(
                                                 fontSize: 12,
-                                                color: AppColors.textLight)),
+                                                color: context.textTertiary)),
                                         const Spacer(),
                                         _peteBadge('Required', accentColor,
                                             isRequired: true),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
+                                    SizedBox(height: 8),
                                     _glassDropdownShell(
                                       accentColor: accentColor,
                                       isExpanded: true,
@@ -1081,27 +1127,19 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                         child: DropdownButton<String>(
                                           value: _reservoirType,
                                           isExpanded: true,
-                                          dropdownColor: const Color(0xFFF0F4FF)
-                                              .withValues(alpha: 0.97),
-                                          icon: Icon(Icons.keyboard_arrow_down,
-                                              color: accentColor, size: 18),
-                                          style: TextStyle(
-                                              fontSize: 14,
-                                              color: accentColor,
-                                              fontWeight: FontWeight.w600),
+                                          dropdownColor: const Color(0xFFF0F4FF),
+                                          icon: Icon(Icons.keyboard_arrow_down, color: accentColor, size: 18),
+                                          style: TextStyle(fontSize: 14, color: accentColor, fontWeight: FontWeight.w600),
                                           items: ['Open', 'Closed']
                                               .map((v) => DropdownMenuItem(
                                                     value: v,
                                                     child: Padding(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          vertical: 4),
+                                                      padding: const EdgeInsets.symmetric(vertical: 4),
                                                       child: Text(v),
                                                     ),
                                                   ))
                                               .toList(),
-                                          onChanged: (val) => setState(
-                                              () => _reservoirType = val!),
+                                          onChanged: (val) => setState(() => _reservoirType = val!),
                                         ),
                                       ),
                                     ),
@@ -1111,12 +1149,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                             ),
                           ),
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
 
                           // C. Pressure Constraint
                           _peteSubHeader(
                               'C', 'Pressure Constraint', accentColor),
-                          const SizedBox(height: 6),
+                          SizedBox(height: 6),
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
@@ -1134,12 +1172,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                           fontWeight: FontWeight.w600,
                                           color: accentColor)),
                                 ),
-                                const SizedBox(width: 8),
-                                const Text(
+                                SizedBox(width: 8),
+                                Text(
                                     'Provide at least one of the two fields below',
                                     style: TextStyle(
                                         fontSize: 11,
-                                        color: AppColors.textLight)),
+                                        color: context.textTertiary)),
                               ],
                             ),
                           ),
@@ -1153,8 +1191,9 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     accentColor: accentColor,
                                     fieldKey: 'frac_pressure',
                                     isRequired: false,
-                                    badgeLabel: 'Either / Or'),
-                                const SizedBox(height: 14),
+                                    badgeLabel: 'Either / Or',
+                                    description: 'Maximum allowable bottomhole pressure before the rock fractures. Injection must stay below this to avoid caprock damage. Provide this OR fracture gradient.'),
+                                SizedBox(height: 14),
                                 _peteField(
                                     label: 'Fracture gradient (G_f)',
                                     unit: 'MPa/m',
@@ -1162,34 +1201,23 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                     accentColor: accentColor,
                                     fieldKey: 'frac_gradient',
                                     isRequired: false,
-                                    badgeLabel: 'Either / Or'),
-                                const SizedBox(height: 14),
-                                _peteField(
-                                    label: 'Safety margin (ΔP_safe)',
-                                    unit: 'MPa',
-                                    controller: _safetyMarginCtrl,
-                                    accentColor: accentColor,
-                                    fieldKey: 'safety_margin',
-                                    isRequired: false,
-                                    badgeLabel: 'Optional',
-                                    hint: 'default: 1.5',
-                                    description:
-                                        'Pressure buffer kept below the fracture limit to avoid reservoir damage.'),
+                                    badgeLabel: 'Either / Or',
+                                    description: '0.015 – 0.025 MPa/m. Fracture pressure per unit depth. The app multiplies this by depth to compute the fracture pressure limit. Provide this OR fracture pressure.'),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
 
                           // D. Advanced Inputs
                           _peteSubHeader('D', 'Advanced Inputs', accentColor),
-                          const SizedBox(height: 6),
-                          const Padding(
+                          SizedBox(height: 6),
+                          Padding(
                             padding: EdgeInsets.only(bottom: 12),
                             child: Text(
                                 'All fields optional — leave blank to use defaults',
                                 style: TextStyle(
-                                    fontSize: 11, color: AppColors.textLight)),
+                                    fontSize: 11, color: context.textTertiary)),
                           ),
                           _sectionCard(
                             child: Column(
@@ -1208,7 +1236,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             hint: 'default: 700',
                                             description:
                                                 'CO₂ density at reservoir conditions. Affects injectivity calculations.')),
-                                    const SizedBox(width: 12),
+                                    SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'CO₂ viscosity (μ)',
@@ -1223,7 +1251,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                                 'CO₂ viscosity at reservoir temperature and pressure.')),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 Row(
                                   children: [
                                     Expanded(
@@ -1239,7 +1267,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             hint: 'default: 0.0001',
                                             description:
                                                 'Combined compressibility of rock and fluids in the reservoir.')),
-                                    const SizedBox(width: 12),
+                                    SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Wellbore radius (r_w)',
@@ -1254,7 +1282,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                                 'Physical radius of the injection well at the reservoir face.')),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 Row(
                                   children: [
                                     Expanded(
@@ -1268,8 +1296,38 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             badgeLabel: 'Optional',
                                             hint: 'default: 0',
                                             description:
-                                                '0 = undamaged well. Positive = damage; negative = stimulation.')),
-                                    const SizedBox(width: 12),
+                                                '-5 – 20. 0 = undamaged. Positive = damage; negative = stimulation.')),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                        child: _peteField(
+                                            label: 'CO₂ saturation (S_CO₂)',
+                                            unit: '–',
+                                            controller: _co2SaturationCtrl,
+                                            accentColor: accentColor,
+                                            fieldKey: 'co2_saturation',
+                                            isRequired: false,
+                                            badgeLabel: 'Optional',
+                                            hint: 'default: 0.2',
+                                            description:
+                                                '0.05 – 0.6. Effective CO₂ saturation in pore space. Used to estimate plume radius.')),
+                                  ],
+                                ),
+                                SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                        child: _peteField(
+                                            label: 'Safety margin (ΔP_safe)',
+                                            unit: 'MPa',
+                                            controller: _safetyMarginCtrl,
+                                            accentColor: accentColor,
+                                            fieldKey: 'safety_margin',
+                                            isRequired: false,
+                                            badgeLabel: 'Optional',
+                                            hint: 'default: 1.5',
+                                            description:
+                                                '1 – 5 MPa. Pressure buffer below fracture limit.')),
+                                    SizedBox(width: 12),
                                     Expanded(
                                         child: _peteField(
                                             label: 'Log start time (t₀)',
@@ -1281,11 +1339,11 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                                             badgeLabel: 'Optional',
                                             hint: 'default: 1',
                                             description:
-                                                'Start time for pressure transient analysis on a log scale.')),
+                                                '0.1 – 10 days. Lower bound to avoid log(0) at early time.')),
                                   ],
                                 ),
                                 if (_reservoirType == 'Closed') ...[
-                                  const SizedBox(height: 14),
+                                  SizedBox(height: 14),
                                   _peteField(
                                       label: 'Closed multiplier (α)',
                                       unit: '–',
@@ -1303,7 +1361,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                           ),
                         ], // end if (_hasReservoirInfo)
 
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32),
 
                         _GlowButton(
                           text: 'Execute Simulation',
@@ -1314,7 +1372,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                               if (_selectedTemp == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text(
+                                    content: Text(
                                         'Please select a temperature.'),
                                     backgroundColor: Colors.red.shade400,
                                     behavior: SnackBarBehavior.floating,
@@ -1328,7 +1386,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                               if (_pressureController.text.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text(
+                                    content: Text(
                                         'Please enter a pressure value.'),
                                     backgroundColor: Colors.red.shade400,
                                     behavior: SnackBarBehavior.floating,
@@ -1344,7 +1402,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                               if (p == null || p < 0.5 || p > 10) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text(
+                                    content: Text(
                                         'Pressure must be between 0.5 – 10 bar.'),
                                     backgroundColor: Colors.red.shade400,
                                     behavior: SnackBarBehavior.floating,
@@ -1393,7 +1451,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                           },
                         ),
 
-                        const SizedBox(height: 40),
+                        SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -1437,7 +1495,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
             children: [
               Icon(Icons.lock_outline,
                   size: 16, color: accentColor.withValues(alpha: 0.6)),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Text(value,
                   style: TextStyle(
                       fontSize: 16,
@@ -1547,14 +1605,16 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: accentColor)),
-              const SizedBox(width: 6),
-              const Expanded(
+              SizedBox(width: 4),
+              FieldInfoTooltip(description: 'Fractional conversion for Rxn 1 (primary ethane cracking) and Rxn 2 (secondary ethane reaction). Only pre-validated pairs are available to ensure mass balance.'),
+              SizedBox(width: 4),
+              Expanded(
                 child: Text('— only valid combinations',
-                    style: TextStyle(fontSize: 10, color: AppColors.textLight)),
+                    style: TextStyle(fontSize: 10, color: context.textTertiary)),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           _glassDropdownShell(
             accentColor: accentColor,
             isExpanded: true,
@@ -1562,58 +1622,29 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
               child: DropdownButton<int>(
                 value: _selectedPairIndex,
                 isExpanded: true,
-                dropdownColor: const Color(0xFFF0F4FF).withValues(alpha: 0.97),
-                icon: Icon(Icons.keyboard_arrow_down,
-                    color: accentColor, size: 18),
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: accentColor),
-                items: _rxnPairs.asMap().entries.map((e) {
-                  return DropdownMenuItem<int>(
-                    value: e.key,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Text('Rxn 1: ',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: accentColor.withValues(alpha: 0.6))),
-                          Text(e.value[0].toStringAsFixed(2),
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: accentColor)),
-                          const SizedBox(width: 16),
-                          Text('Rxn 2: ',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: accentColor.withValues(alpha: 0.6))),
-                          Text(e.value[1].toStringAsFixed(2),
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: accentColor)),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (idx) {
-                  if (idx != null) {
-                    setState(() {
-                      _selectedPairIndex = idx;
-                      _reactions[0]['value'] = _rxnPairs[idx][0];
-                      _reactions[1]['value'] = _rxnPairs[idx][1];
-                    });
-                  }
+                dropdownColor: const Color(0xFFF0F4FF),
+                icon: Icon(Icons.keyboard_arrow_down, color: accentColor, size: 18),
+                style: TextStyle(fontSize: 14, color: accentColor, fontWeight: FontWeight.w600),
+                items: _rxnPairs.asMap().entries.map((e) => DropdownMenuItem(
+                  value: e.key,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text('Rxn 1: ${e.value[0].toStringAsFixed(2)}   Rxn 2: ${e.value[1].toStringAsFixed(2)}'),
+                  ),
+                )).toList(),
+                onChanged: (val) {
+                  if (val == null) return;
+                  setState(() {
+                    _selectedPairIndex = val;
+                    _reactions[0]['value'] = _rxnPairs[val][0];
+                    _reactions[1]['value'] = _rxnPairs[val][1];
+                  });
                 },
               ),
             ),
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
 
           // ── Stacked reaction cards ──
           _rxnMiniCard(
@@ -1622,7 +1653,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
               stoichiometry: _reactions[0]['stoichiometry'] as String,
               value: pair[0],
               accentColor: accentColor),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _rxnMiniCard(
               badge: 2,
               component: _reactions[1]['component'] as String,
@@ -1643,7 +1674,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: accentColor.withValues(alpha: 0.12)),
       ),
@@ -1651,26 +1682,26 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _rxnBadge(badge, accentColor),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(component,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.darkBase)),
-                const SizedBox(height: 4),
+                        color: context.textPrimary)),
+                SizedBox(height: 4),
                 Text(stoichiometry,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textMedium,
+                        color: context.textSecondary,
                         height: 1.5)),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Text(value.toStringAsFixed(2),
               style: TextStyle(
                   fontSize: 16,
@@ -1702,14 +1733,16 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: accentColor)),
-              const SizedBox(width: 6),
-              const Expanded(
+              SizedBox(width: 4),
+              FieldInfoTooltip(description: 'Fractional conversions for Rxn 1 (primary ethane cracking), Rxn 2 (secondary ethane), and Rxn 3 (propane cracking). Only pre-validated triplets are available to ensure mass balance across the full reaction network.'),
+              SizedBox(width: 4),
+              Expanded(
                 child: Text('— only valid combinations',
-                    style: TextStyle(fontSize: 10, color: AppColors.textLight)),
+                    style: TextStyle(fontSize: 10, color: context.textTertiary)),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           _glassDropdownShell(
             accentColor: accentColor,
             isExpanded: true,
@@ -1717,82 +1750,43 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
               child: DropdownButton<int>(
                 value: _selectedTripletIndex,
                 isExpanded: true,
-                dropdownColor: const Color(0xFFF0F4FF).withValues(alpha: 0.97),
-                icon: Icon(Icons.keyboard_arrow_down,
-                    color: accentColor, size: 18),
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: accentColor),
-                items: _rxnTriplets.asMap().entries.map((e) {
-                  return DropdownMenuItem<int>(
-                    value: e.key,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Text('Rxn 1: ',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: accentColor.withValues(alpha: 0.6))),
-                          Text(e.value[0].toStringAsFixed(2),
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: accentColor)),
-                          const SizedBox(width: 12),
-                          Text('Rxn 2: ',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: accentColor.withValues(alpha: 0.6))),
-                          Text(e.value[1].toStringAsFixed(2),
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: accentColor)),
-                          const SizedBox(width: 12),
-                          Text('Rxn 3: ',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: accentColor.withValues(alpha: 0.6))),
-                          Text(e.value[2].toStringAsFixed(2),
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: accentColor)),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (idx) {
-                  if (idx != null) {
-                    setState(() {
-                      _selectedTripletIndex = idx;
-                      _reactions[0]['value'] = _rxnTriplets[idx][0];
-                      _reactions[1]['value'] = _rxnTriplets[idx][1];
-                      _reactions[2]['value'] = _rxnTriplets[idx][2];
-                    });
-                  }
+                dropdownColor: const Color(0xFFF0F4FF),
+                icon: Icon(Icons.keyboard_arrow_down, color: accentColor, size: 18),
+                style: TextStyle(fontSize: 14, color: accentColor, fontWeight: FontWeight.w600),
+                items: _rxnTriplets.asMap().entries.map((e) => DropdownMenuItem(
+                  value: e.key,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text('${e.value[0].toStringAsFixed(2)} / ${e.value[1].toStringAsFixed(2)} / ${e.value[2].toStringAsFixed(2)}'),
+                  ),
+                )).toList(),
+                onChanged: (val) {
+                  if (val == null) return;
+                  setState(() {
+                    _selectedTripletIndex = val;
+                    _reactions[0]['value'] = _rxnTriplets[val][0];
+                    _reactions[1]['value'] = _rxnTriplets[val][1];
+                    _reactions[2]['value'] = _rxnTriplets[val][2];
+                  });
                 },
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _rxnMiniCard(
               badge: 1,
               component: _reactions[0]['component'] as String,
               stoichiometry: _reactions[0]['stoichiometry'] as String,
               value: triplet[0],
               accentColor: accentColor),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _rxnMiniCard(
               badge: 2,
               component: _reactions[1]['component'] as String,
               stoichiometry: _reactions[1]['stoichiometry'] as String,
               value: triplet[1],
               accentColor: accentColor),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _rxnMiniCard(
               badge: 3,
               component: _reactions[2]['component'] as String,
@@ -1812,57 +1806,45 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
         Row(
           children: [
             _rxnBadge(1, accentColor),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(r['component'] as String,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.darkBase,
+                        color: context.textPrimary,
                       )),
                   Text(r['stoichiometry'] as String,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textLight,
+                        color: context.textTertiary,
                       )),
                 ],
               ),
             ),
-            // Liquid glass dropdown for Rxn 1 fraction
+            FieldInfoTooltip(description: _rxnDescriptions[1]!),
+            SizedBox(width: 6),
             _glassDropdownShell(
               accentColor: accentColor,
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<double>(
                   value: _selectedRxn1,
-                  isDense: true,
-                  dropdownColor:
-                      const Color(0xFFF0F4FF).withValues(alpha: 0.97),
-                  icon: Icon(Icons.keyboard_arrow_down,
-                      color: accentColor, size: 18),
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: accentColor,
-                  ),
-                  items: _rxn1Values.map((v) {
-                    return DropdownMenuItem<double>(
-                      value: v,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Text(v.toStringAsFixed(2)),
-                      ),
-                    );
-                  }).toList(),
+                  dropdownColor: const Color(0xFFF0F4FF),
+                  icon: Icon(Icons.keyboard_arrow_down, color: accentColor, size: 18),
+                  style: TextStyle(fontSize: 14, color: accentColor, fontWeight: FontWeight.w600),
+                  items: _rxn1Values.map((v) => DropdownMenuItem(
+                    value: v,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(v.toStringAsFixed(2)),
+                    ),
+                  )).toList(),
                   onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedRxn1 = val;
-                        _reactions[0]['value'] = val;
-                      });
-                    }
+                    if (val == null) return;
+                    setState(() { _selectedRxn1 = val; _reactions[0]['value'] = val; });
                   },
                 ),
               ),
@@ -1953,7 +1935,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                 ),
                 child: Icon(Icons.co2_outlined, color: accentColor, size: 20),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1963,10 +1945,10 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: accentColor)),
-                    const SizedBox(height: 2),
-                    const Text('Geological storage feasibility inputs',
+                    SizedBox(height: 2),
+                    Text('Geological storage feasibility inputs',
                         style: TextStyle(
-                            fontSize: 11, color: AppColors.textLight)),
+                            fontSize: 11, color: context.textTertiary)),
                   ],
                 ),
               ),
@@ -1993,12 +1975,12 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                       fontWeight: FontWeight.w800,
                       color: accentColor))),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: AppColors.darkBase)),
+                color: context.textPrimary)),
       ],
     );
   }
@@ -2033,7 +2015,11 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
   }) {
     final hintText = hint ?? (unit != '–' ? unit : 'Enter value');
     final hasError = fieldKey != null && _errorFields.contains(fieldKey);
+    final liveRange = fieldKey != null ? _liveRangeErrors[fieldKey] : null;
+    final hasLiveError = liveRange != null;
     const errorRed = Color(0xFFE74C3C);
+    final effectiveColor = (hasError || hasLiveError) ? errorRed : accentColor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2043,13 +2029,13 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
               child: Text(label,
                   style: TextStyle(
                       fontSize: 12,
-                      color: hasError ? errorRed : AppColors.textLight)),
+                      color: (hasError || hasLiveError) ? errorRed : AppColors.textLight)),
             ),
-            _peteBadge(badgeLabel, hasError ? errorRed : accentColor,
-                isRequired: isRequired),
+            if (description != null) FieldInfoTooltip(description: description),
+            _peteBadge(badgeLabel, effectiveColor, isRequired: isRequired),
           ],
         ),
-        const SizedBox(height: 7),
+        SizedBox(height: 7),
         ClipRRect(
           borderRadius: BorderRadius.circular(13),
           child: BackdropFilter(
@@ -2059,21 +2045,20 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                 gradient: LinearGradient(
                   colors: [
                     Colors.white.withValues(alpha: 0.60),
-                    (hasError ? errorRed : accentColor).withValues(alpha: 0.07)
+                    effectiveColor.withValues(alpha: 0.07),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(
-                    color: hasError
+                    color: (hasError || hasLiveError)
                         ? errorRed.withValues(alpha: 0.65)
                         : Colors.white.withValues(alpha: 0.6),
-                    width: hasError ? 1.5 : 1.2),
+                    width: (hasError || hasLiveError) ? 1.5 : 1.2),
                 boxShadow: [
                   BoxShadow(
-                      color: (hasError ? errorRed : accentColor)
-                          .withValues(alpha: 0.12),
+                      color: effectiveColor.withValues(alpha: 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 3))
                 ],
@@ -2084,13 +2069,16 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: hasError ? errorRed : accentColor),
+                    color: effectiveColor),
                 decoration: InputDecoration(
                   hintText: hintText,
                   hintStyle: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textLight.withValues(alpha: 0.65),
+                      color: context.textTertiary.withValues(alpha: 0.65),
                       fontWeight: FontWeight.w400),
+                  suffix: unit != '–'
+                      ? Text(unit, style: TextStyle(fontSize: 11, color: context.textTertiary.withValues(alpha: 0.75), fontWeight: FontWeight.w500))
+                      : null,
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -2103,15 +2091,18 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
             ),
           ),
         ),
-        if (description != null) ...[
-          const SizedBox(height: 5),
+        if (hasLiveError) ...[
+          SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 4),
-            child: Text(description,
-                style: TextStyle(
-                    fontSize: 10.5,
-                    color: AppColors.textLight.withValues(alpha: 0.8),
-                    height: 1.4)),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, size: 11, color: Color(0xFFE74C3C)),
+                SizedBox(width: 4),
+                Expanded(child: Text('Valid range: $liveRange',
+                    style: TextStyle(fontSize: 10.5, color: Color(0xFFE74C3C), fontWeight: FontWeight.w600, height: 1.4))),
+              ],
+            ),
           ),
         ],
       ],
@@ -2164,10 +2155,10 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
 
   Widget _sectionTitle(String title) {
     return Text(title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
-          color: AppColors.darkBase,
+          color: context.textPrimary,
         ));
   }
 
@@ -2175,11 +2166,11 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryBlue.withValues(alpha: 0.07),
+            color: context.cardShadow,
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -2188,6 +2179,7 @@ class _ConfigureSimulationScreenState extends State<ConfigureSimulationScreen>
       child: child,
     );
   }
+
 }
 
 class _GlowButton extends StatefulWidget {
@@ -2209,132 +2201,75 @@ class _GlowButton extends StatefulWidget {
 
 class _GlowButtonState extends State<_GlowButton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _borderProgress;
-  late Animation<double> _glowRadius;
-  bool _tapped = false;
+  AnimationController? _ctrl;
+  double _scale = 1.0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 600),
     );
-    _borderProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.65, curve: Curves.easeInOut)),
-    );
-    _glowRadius = Tween<double>(begin: 6.0, end: 30.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.65, curve: Curves.easeOut)),
-    );
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        widget.onPressed();
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            _controller.reset();
-            setState(() => _tapped = false);
-          }
-        });
-      }
+    _ctrl!.addListener(() {
+      final raw = _ctrl!.value;
+      // compress on forward (0→1 maps 1.0→0.93), bounce on reverse with overshoot
+      setState(() => _scale = 1.0 - (raw * 0.07));
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl?.dispose();
     super.dispose();
   }
 
   void _handleTap() {
-    if (_tapped) return;
-    setState(() => _tapped = true);
-    _controller.forward();
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    ctrl.forward(from: 0.0).then((_) {
+      if (!mounted) return;
+      widget.onPressed();
+      ctrl.animateBack(0.0, curve: Curves.elasticOut);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _handleTap,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) => SizedBox(
+      child: Transform.scale(
+        scale: _scale,
+        child: Container(
           width: double.infinity,
           height: 52,
-          child: Stack(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [widget.accentColor, AppColors.primaryBlue],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: widget.accentColor.withValues(alpha: 0.55),
+                blurRadius: 18,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: double.infinity,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [widget.accentColor, AppColors.primaryBlue],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.accentColor.withValues(alpha: 0.55),
-                      blurRadius: _glowRadius.value,
-                      spreadRadius: _glowRadius.value * 0.2,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(widget.icon, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Text(widget.text, style: AppTextStyles.buttonText),
-                  ],
-                ),
-              ),
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _BorderDrawPainter(
-                    progress: _borderProgress.value,
-                    color: widget.accentColor,
-                  ),
-                ),
-              ),
+              Icon(widget.icon, color: context.surface, size: 20),
+              SizedBox(width: 8),
+              Text(widget.text, style: AppTextStyles.buttonText),
             ],
           ),
         ),
       ),
     );
   }
-}
-
-class _BorderDrawPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-
-  _BorderDrawPainter({required this.progress, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress == 0) return;
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        const Radius.circular(30),
-      ));
-    final metrics = path.computeMetrics().first;
-    canvas.drawPath(metrics.extractPath(0, metrics.length * progress), paint);
-  }
-
-  @override
-  bool shouldRepaint(_BorderDrawPainter old) => old.progress != progress;
 }

@@ -86,11 +86,11 @@ def _save(body: dict):
     )
 
     table.put_item(Item=_to_decimal({
+        **metadata,
         'userId':     user_id,
-        'scenarioId': scenario_id,
+        'scenarioId': scenario_id,  # UUID — must come after **metadata to prevent override
         's3Key':      s3_key,
         'createdAt':  datetime.now(timezone.utc).isoformat(),
-        **metadata,
     }))
 
     return respond(200, {'scenarioId': scenario_id, 's3Key': s3_key})

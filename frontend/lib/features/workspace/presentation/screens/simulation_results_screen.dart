@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'main_shell.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/scenario_service.dart';
@@ -92,11 +94,11 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     final r = data['results'] as Map<String, dynamic>;
     final perf = data['performance'] as Map<String, dynamic>;
 
-    final ethyleneYield = (r['ethylene_yield_percent'] as num).toDouble();
-    final furnaceReduction = (r['furnace_reduction_percent'] as num).toDouble();
-    final costSaving = (r['cost_saving_percent'] as num).toDouble();
-    final hydrogenPurity = (r['hydrogen_purity_percent'] as num).toDouble();
-    final co2Rate = (r['co2_rate'] as num).toDouble();
+    final ethyleneYield = (r['ethylene_yield_percent'] as num? ?? 0).toDouble();
+    final furnaceReduction = (r['furnace_reduction_percent'] as num? ?? 0).toDouble();
+    final costSaving = (r['cost_saving_percent'] as num? ?? 0).toDouble();
+    final hydrogenPurity = (r['hydrogen_purity_percent'] as num? ?? 0).toDouble();
+    final co2Rate = (r['co2_rate'] as num? ?? 0).toDouble();
 
     // Reservoir results (only present when use_reservoir=true)
     final res = data['reservoir'] as Map<String, dynamic>?;
@@ -139,6 +141,14 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           (res?['max_sustainable_rate_kg_hr'] as num? ?? 0).toDouble(),
       'plumeRadius':
           (res?['estimated_plume_radius_m'] as num? ?? 0).toDouble(),
+      'allowablePressure':
+          (res?['allowable_pressure_mpa'] as num? ?? 0).toDouble(),
+      'pressureSeries': (res?['pressure_series'] as List<dynamic>? ?? [])
+          .map((p) => FlSpot((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+          .toList(),
+      'plumeSeries': (res?['plume_series'] as List<dynamic>? ?? [])
+          .map((p) => FlSpot((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+          .toList(),
       'iseRecommendation': ise?['recommendation'] as String? ?? '',
       'ethyleneKgHr': (iseKpis?['ethylene_kg_hr'] as num? ?? 0).toDouble(),
       'hydrogenKgHr': (iseKpis?['hydrogen_kg_hr'] as num? ?? 0).toDouble(),
@@ -158,7 +168,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        decoration: BoxDecoration(gradient: context.bgGradient),
         child: SafeArea(
           child: FadeTransition(
             opacity: _fade,
@@ -170,13 +180,13 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(
+                    child: Row(
                       children: [
                         Icon(Icons.arrow_back_ios,
-                            size: 16, color: AppColors.textMedium),
+                            size: 16, color: context.textSecondary),
                         SizedBox(width: 4),
                         Text('Back to Configuration',
-                            style: AppTextStyles.body),
+                            style: TextStyle(fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
@@ -188,15 +198,15 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Simulation Results',
-                            style: AppTextStyles.heading1),
-                        const SizedBox(height: 20),
+                        Text('Simulation Results',
+                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                        SizedBox(height: 20),
 
                         // Tabs
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.surface,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: SingleChildScrollView(
@@ -239,7 +249,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
 
                         // Tab content
                         if (_isLoading)
@@ -249,7 +259,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                         else
                           _buildTabContent(accentColor),
 
-                        const SizedBox(height: 24),
+                        SizedBox(height: 24),
 
                         // Action buttons
                         Row(
@@ -262,7 +272,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                                       accentColor: accentColor,
                                       onTap: () =>
                                           _showSaveDialog(context, accentColor))),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                             ],
                             Expanded(
                                 child: _GlowActionButton(
@@ -270,7 +280,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                                     label: 'Report',
                                     accentColor: accentColor,
                                     onTap: () => _generateReport(context))),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Expanded(
                                 child: _GlowActionButton(
                                     icon: Icons.refresh_rounded,
@@ -280,7 +290,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                           ],
                         ),
 
-                        const SizedBox(height: 40),
+                        SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -301,9 +311,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(color: accentColor, strokeWidth: 2.5),
-          const SizedBox(height: 20),
-          const Text('Running simulation…',
-              style: TextStyle(fontSize: 14, color: AppColors.textMedium)),
+          SizedBox(height: 20),
+          Text('Running simulation…',
+              style: TextStyle(fontSize: 14, color: context.textSecondary)),
         ],
       ),
     );
@@ -319,19 +329,19 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       ),
       child: Column(
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 36),
-          const SizedBox(height: 12),
-          const Text('Simulation failed',
+          Icon(Icons.error_outline, color: Colors.red, size: 36),
+          SizedBox(height: 12),
+          Text('Simulation failed',
               style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.darkBase)),
-          const SizedBox(height: 8),
+                  color: context.textPrimary)),
+          SizedBox(height: 8),
           Text(_error ?? 'Unknown error',
               textAlign: TextAlign.center,
               style:
-                  const TextStyle(fontSize: 12, color: AppColors.textMedium)),
-          const SizedBox(height: 16),
+                  TextStyle(fontSize: 12, color: context.textSecondary)),
+          SizedBox(height: 16),
           GestureDetector(
             onTap: () {
               setState(() {
@@ -345,9 +355,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                   color: accentColor, borderRadius: BorderRadius.circular(10)),
-              child: const Text('Retry',
+              child: Text('Retry',
                   style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
+                      color: context.surface, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -391,12 +401,12 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Cracking Performance (always first) ──
-        const Text('Cracking Performance',
+        Text('Cracking Performance',
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: AppColors.darkBase)),
-        const SizedBox(height: 12),
+                color: context.textPrimary)),
+        SizedBox(height: 12),
 
         _cheMetricCard(
           label: 'Ethylene Yield',
@@ -406,16 +416,16 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           color: AppColors.cyan,
           perf: perfFor('ethylene_yield'),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _cheMetricCard(
           label: 'Furnace Reduction',
           value: (r['furnaceReduction'] as double).toStringAsFixed(1),
           unit: '%',
           icon: Icons.local_fire_department_outlined,
-          color: Colors.orange,
+          color: AppColors.cyan,
           perf: perfFor('furnace_reduction'),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _cheMetricCard(
           label: 'Cost Saving',
           value: (r['costSaving'] as double).toStringAsFixed(1),
@@ -424,7 +434,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           color: AppColors.purple,
           perf: perfFor('cost_saving'),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _cheMetricCard(
           label: 'Hydrogen Purity',
           value: (r['hydrogenPurity'] as double).toStringAsFixed(1),
@@ -436,9 +446,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
         // ── CO₂ Storage (only when reservoir was run) ──
         if (widget.useReservoir) ...[
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _buildFeasibilityCard(r),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -451,7 +461,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     'How long we can inject before reaching the pressure limit.',
                 color: AppColors.cyan,
               )),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                   child: _peteMetricCard(
                 label: 'Pressure at\nProject End',
@@ -464,7 +474,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               )),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -477,7 +487,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     'Maximum CO₂ rate the reservoir can handle safely.',
                 color: AppColors.midTone,
               )),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                   child: _peteMetricCard(
                 label: 'Plume\nRadius',
@@ -490,7 +500,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               )),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
         ],
 
       ],
@@ -527,18 +537,18 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               color: feasColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text('CO₂ STORAGE FEASIBILITY',
+            child: Text('CO₂ STORAGE FEASIBILITY',
                 style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textLight,
+                    color: context.textTertiary,
                     letterSpacing: 0.5)),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             children: [
               Icon(feasIcon, color: feasColor, size: 28),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Text(feasLabel,
                   style: TextStyle(
                       fontSize: 22,
@@ -547,11 +557,11 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
             ],
           ),
           if (feasMsg.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(feasMsg,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textMedium,
+                    color: context.textSecondary,
                     height: 1.5)),
           ],
         ],
@@ -575,7 +585,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
         boxShadow: [
@@ -596,7 +606,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                 borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,10 +614,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                 Row(
                   children: [
                     Text(label,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.darkBase)),
+                            color: context.textPrimary)),
                     const Spacer(),
                     Text('$value $unit',
                         style: TextStyle(
@@ -616,7 +626,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                             color: color)),
                   ],
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -630,11 +640,11 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                           fontWeight: FontWeight.w700,
                           color: statusColor)),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(explanation,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textLight,
+                        color: context.textTertiary,
                         height: 1.4)),
               ],
             ),
@@ -655,7 +665,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
         boxShadow: [
@@ -678,129 +688,292 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     borderRadius: BorderRadius.circular(9)),
                 child: Icon(icon, color: color, size: 17),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(
                   child: Text(label,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textLight,
+                          color: context.textTertiary,
                           height: 1.4))),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(value,
                   style: TextStyle(
                       fontSize: 24, fontWeight: FontWeight.w800, color: color)),
-              const SizedBox(width: 4),
+              SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(unit,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textMedium)),
+                    style: TextStyle(
+                        fontSize: 12, color: context.textSecondary)),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(description,
-              style: const TextStyle(
-                  fontSize: 10, color: AppColors.textLight, height: 1.4)),
+              style: TextStyle(
+                  fontSize: 10, color: context.textTertiary, height: 1.4)),
         ],
       ),
     );
   }
 
   Widget _buildPerformance(Color accentColor) {
+    final r = _results;
+    final pressureSpots = (r?['pressureSeries'] as List<FlSpot>?) ?? [];
+    final plumeSpots    = (r?['plumeSeries']    as List<FlSpot>?) ?? [];
+    final pAllow          = (r?['allowablePressure'] as double?) ?? 0.0;
+    final reservoirRadius = (widget.reservoirInputs?['radius'] as num? ?? 0).toDouble();
+
+    final projectDuration =
+        (widget.reservoirInputs?['project_duration'] as num?)?.toDouble() ?? 100.0;
+    // Compute effectiveXMax here so all spots use the same final bound
+    final xRaw       = projectDuration * 1.1;
+    final xInterval  = _niceInterval(0, xRaw, 7);
+    final xMax       = _niceMax(xRaw, xInterval);
+
+    // Pressure Y
+    final actualPressMin = pressureSpots.isNotEmpty
+        ? pressureSpots.map((s) => s.y).reduce(math.min)
+        : pAllow;
+    final actualPressMax = pressureSpots.isNotEmpty
+        ? pressureSpots.map((s) => s.y).reduce(math.max)
+        : pAllow;
+    final pressYMin = math.min(actualPressMin, pAllow) - 1.0;
+    final pressYMax = math.max(actualPressMax, pAllow) + 1.0;
+
+    // Plume Y
+    final actualPlumeMax = plumeSpots.isNotEmpty
+        ? plumeSpots.map((s) => s.y).reduce(math.max)
+        : 0.0;
+    final plumeYMax = math.max(reservoirRadius + 1000, actualPlumeMax + 200);
+
+    // Reference lines span exactly 0 → xMax (same as chart bounds)
+    final pAllowSpots = [FlSpot(0, pAllow), FlSpot(xMax, pAllow)];
+    final resRadSpots = [FlSpot(0, reservoirRadius), FlSpot(xMax, reservoirRadius)];
+
     return Column(
       children: [
-        _chartPlaceholder(
+        _reservoirLineChart(
           title: 'Pressure vs Time',
-          description:
-              'Shows how reservoir pressure increases over time and where it hits the allowable limit.',
-          icon: Icons.show_chart_rounded,
-          accentColor: accentColor,
+          series: [
+            _ChartSeries(spots: pressureSpots, label: 'Pressure (MPa)',    color: AppColors.primaryBlue,   dashed: false),
+            _ChartSeries(spots: pAllowSpots,   label: 'Allowable P (MPa)', color: const Color(0xFFE74C3C), dashed: true),
+          ],
+          xMax: xMax,
+          xInterval: xInterval,
+          yMin: pressYMin,
+          yMax: pressYMax,
+          xLabel: 'Time (years)',
+          yLabel: 'Pressure (MPa)',
         ),
-        const SizedBox(height: 16),
-        _chartPlaceholder(
+        SizedBox(height: 16),
+        _reservoirLineChart(
           title: 'Plume Radius vs Time',
-          description:
-              'Shows how the CO₂ plume spreads in the reservoir over the project duration.',
-          icon: Icons.radar_outlined,
-          accentColor: AppColors.cyan,
+          series: [
+            _ChartSeries(spots: plumeSpots,  label: 'Plume radius (m)',    color: AppColors.cyan,          dashed: false),
+            _ChartSeries(spots: resRadSpots, label: 'Reservoir radius (m)', color: const Color(0xFFE74C3C), dashed: true),
+          ],
+          xMax: xMax,
+          xInterval: xInterval,
+          yMin: 0,
+          yMax: plumeYMax,
+          xLabel: 'Time (years)',
+          yLabel: 'Radius (m)',
         ),
       ],
     );
   }
 
-  Widget _chartPlaceholder({
+  // ── Nice-number helpers ───────────────────────────────────────────────────
+  static double _niceInterval(double min, double max, int ticks) {
+    final range = (max - min).abs();
+    if (range == 0) return 1.0;
+    final rough = range / (ticks - 1);
+    final mag = math.pow(10, (math.log(rough) / math.ln10).floor()).toDouble();
+    final norm = rough / mag;
+    if (norm <= 1.5) return mag;
+    if (norm <= 3.0) return 2 * mag;
+    if (norm <= 7.0) return 5 * mag;
+    return 10 * mag;
+  }
+  static double _niceMin(double v, double i) => (v / i).floor() * i;
+  static double _niceMax(double v, double i) => (v / i).ceil()  * i;
+
+  Widget _reservoirLineChart({
     required String title,
-    required String description,
-    required IconData icon,
-    required Color accentColor,
+    required List<_ChartSeries> series,
+    required double xMax,
+    required double xInterval,
+    required double yMin,
+    required double yMax,
+    required String xLabel,
+    required String yLabel,
   }) {
+    // Ensure valid range
+    final safeYMin = yMin.isFinite ? yMin : 0.0;
+    final safeYMax = (yMax.isFinite && yMax > safeYMin) ? yMax : safeYMin + 1.0;
+
+    final yInterval      = _niceInterval(safeYMin, safeYMax, 7);
+    final effectiveYMin  = _niceMin(safeYMin, yInterval);
+    final effectiveYMax  = _niceMax(safeYMax, yInterval);
+    final effectiveXMax  = xMax;
+
+    String yFmt(double v) =>
+        yInterval >= 100 ? v.toStringAsFixed(1) : v.toStringAsFixed(2);
+
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: AppColors.primaryBlue.withValues(alpha: 0.07),
+              color: context.cardShadow,
               blurRadius: 16,
-              offset: const Offset(0, 4))
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, color: accentColor, size: 18),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w700,
+                  color: context.textPrimary)),
+          SizedBox(height: 20),
+          RepaintBoundary(
+            child: SizedBox(
+              height: 320,
+              child: LineChart(
+                LineChartData(
+                clipData: const FlClipData.all(),
+                minX: 0,
+                maxX: effectiveXMax,
+                minY: effectiveYMin,
+                maxY: effectiveYMax,
+                lineBarsData: series.map((s) => LineChartBarData(
+                  spots: s.spots.isEmpty
+                      ? [FlSpot(0, safeYMin), FlSpot(effectiveXMax, safeYMin)]
+                      : s.spots,
+                  isCurved: !s.dashed,
+                  color: s.spots.isEmpty
+                      ? s.color.withValues(alpha: 0)
+                      : s.color,
+                  barWidth: s.dashed ? 2.5 : 4.0,
+                  dotData: const FlDotData(show: false),
+                  dashArray: s.dashed ? [6, 4] : null,
+                  belowBarData: BarAreaData(show: false),
+                )).toList(),
+                titlesData: FlTitlesData(
+                  topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    axisNameWidget: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(xLabel,
+                          style: TextStyle(fontSize: 12,
+                              color: context.textSecondary,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    axisNameSize: 28,
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 64,
+                      interval: xInterval,
+                      getTitlesWidget: (v, meta) {
+                        final label = xInterval >= 1
+                            ? v.toStringAsFixed(0)
+                            : xInterval >= 0.1
+                                ? v.toStringAsFixed(1)
+                                : v.toStringAsFixed(2);
+                        return SideTitleWidget(
+                          axisSide: meta.axisSide,
+                          child: Text(label,
+                              style: TextStyle(
+                                  fontSize: 10, color: context.textTertiary)),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    axisNameWidget: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(yLabel,
+                          style: TextStyle(fontSize: 12,
+                              color: context.textSecondary,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    axisNameSize: 28,
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 62,
+                      interval: yInterval,
+                      getTitlesWidget: (v, _) => Text(yFmt(v),
+                          style: TextStyle(
+                              fontSize: 10, color: context.textTertiary),
+                          textAlign: TextAlign.right),
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: true,
+                  horizontalInterval: yInterval,
+                  verticalInterval: xInterval,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                      color: context.textTertiary.withValues(alpha: 0.18),
+                      strokeWidth: 1.0),
+                  getDrawingVerticalLine: (_) => FlLine(
+                      color: context.textTertiary.withValues(alpha: 0.18),
+                      strokeWidth: 1.0),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(
+                      color: context.textTertiary.withValues(alpha: 0.30),
+                      width: 1.0),
+                ),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) =>
+                        AppColors.darkBase.withValues(alpha: 0.85),
+                    getTooltipItems: (touched) => touched.map((s) {
+                      final label = series[s.barIndex].label;
+                      return LineTooltipItem(
+                        '${s.y.toStringAsFixed(2)}\n',
+                        TextStyle(fontSize: 11, color: context.surface,
+                            fontWeight: FontWeight.w600),
+                        children: [TextSpan(text: label,
+                            style: TextStyle(fontSize: 9,
+                                color: Colors.white70))],
+                      );
+                    }).toList(),
+                  ),
+                ),
+                ),
+                duration: Duration.zero,
               ),
-              const SizedBox(width: 12),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.darkBase)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 130,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: accentColor.withValues(alpha: 0.12)),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.insert_chart_outlined_rounded,
-                      size: 36, color: accentColor.withValues(alpha: 0.3)),
-                  const SizedBox(height: 8),
-                  Text('Chart coming soon',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: accentColor.withValues(alpha: 0.5))),
-                ],
-              ),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(description,
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textLight, height: 1.5)),
+          SizedBox(height: 14),
+          Wrap(
+            spacing: 18, runSpacing: 6,
+            children: series.map((s) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomPaint(size: const Size(22, 10),
+                    painter: _LineLegendPainter(color: s.color, dashed: s.dashed)),
+                SizedBox(width: 6),
+                Text(s.label,
+                    style: TextStyle(fontSize: 10, color: context.textTertiary)),
+              ],
+            )).toList(),
+          ),
         ],
       ),
     );
@@ -834,21 +1007,21 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   ),
                   child: Icon(Icons.lightbulb_outline, color: accentColor, size: 18),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Optimization Recommendation',
+                      Text('Optimization Recommendation',
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.darkBase)),
-                      const SizedBox(height: 6),
+                              color: context.textPrimary)),
+                      SizedBox(height: 6),
                       Text(iseRec,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textMedium,
+                              color: context.textSecondary,
                               height: 1.5)),
                     ],
                   ),
@@ -861,19 +1034,19 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.surface,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Column(
+            child: Column(
               children: [
                 Icon(Icons.lightbulb_outline, size: 40, color: AppColors.highlight),
                 SizedBox(height: 12),
                 Text('No recommendation available',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textMedium)),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.textSecondary)),
                 SizedBox(height: 6),
                 Text('Run a simulation to receive optimization guidance.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                    style: TextStyle(fontSize: 12, color: context.textTertiary)),
               ],
             ),
           ),
@@ -887,12 +1060,12 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Calculated KPIs',
+        Text('Calculated KPIs',
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: AppColors.darkBase)),
-        const SizedBox(height: 12),
+                color: context.textPrimary)),
+        SizedBox(height: 12),
         _kpiCard(
           label: 'Ethylene Production',
           value: ((r['ethyleneKgHr'] as double?) ?? 0.0).toStringAsFixed(1),
@@ -901,7 +1074,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           color: accentColor,
           description: 'Mass flow rate of ethylene produced from cracking.',
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _kpiCard(
           label: 'Hydrogen Production',
           value: ((r['hydrogenKgHr'] as double?) ?? 0.0).toStringAsFixed(1),
@@ -910,13 +1083,13 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           color: AppColors.cyan,
           description: 'Mass flow rate of hydrogen recovered from the process.',
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _kpiCard(
           label: 'CO₂ Emissions',
           value: ((r['co2eKgHr'] as double?) ?? 0.0).toStringAsFixed(1),
           unit: 'kg/hr',
           icon: Icons.cloud_outlined,
-          color: Colors.orange,
+          color: const Color(0xFF2ECC71),
           description: 'CO₂ equivalent emissions from the cracking process.',
         ),
       ],
@@ -935,7 +1108,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.20), width: 1.2),
         boxShadow: [
@@ -955,24 +1128,24 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                 borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.darkBase)),
-                const SizedBox(height: 2),
+                        color: context.textPrimary)),
+                SizedBox(height: 2),
                 Text(description,
-                    style: const TextStyle(
-                        fontSize: 10, color: AppColors.textLight, height: 1.4)),
+                    style: TextStyle(
+                        fontSize: 10, color: context.textTertiary, height: 1.4)),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -980,8 +1153,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   style: TextStyle(
                       fontSize: 22, fontWeight: FontWeight.w800, color: color)),
               Text(unit,
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textMedium)),
+                  style: TextStyle(
+                      fontSize: 11, color: context.textSecondary)),
             ],
           ),
         ],
@@ -1005,7 +1178,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
             margin: const EdgeInsets.symmetric(horizontal: 40),
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.92),
+              color: context.surface.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(28),
               border: Border.all(color: accentColor.withValues(alpha: 0.18), width: 1.2),
               boxShadow: [
@@ -1033,18 +1206,18 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                         color: accentColor, strokeWidth: 2.5),
                   ),
                 ),
-                const SizedBox(height: 20),
-                const Text('Generating Report',
+                SizedBox(height: 20),
+                Text('Generating Report',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.darkBase)),
-                const SizedBox(height: 8),
-                const Text('Building your PDF, this may take\na few seconds…',
+                        color: context.textPrimary)),
+                SizedBox(height: 8),
+                Text('Building your PDF, this may take\na few seconds…',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textMedium,
+                        color: context.textSecondary,
                         height: 1.5)),
               ],
             ),
@@ -1054,6 +1227,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     );
 
     try {
+      final now = DateTime.now();
+      final ts  = '${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}'
+                  '_${now.hour.toString().padLeft(2,'0')}${now.minute.toString().padLeft(2,'0')}${now.second.toString().padLeft(2,'0')}';
+
       final url = await ReportService.generateReport(
         scenario: widget.scenario['title'] as String,
         temperature: widget.temperature,
@@ -1062,6 +1239,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         selectedValue: widget.selectedValue,
         useReservoir: widget.useReservoir,
         results: _results!,
+        reservoir: _rawApiData?['reservoir'] as Map<String, dynamic>?,
       );
 
       final response = await http.get(Uri.parse(url));
@@ -1072,7 +1250,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
       await Printing.layoutPdf(
         onLayout: (_) async => bytes,
-        name: '${widget.scenario['title']}_Report',
+        name: '${widget.scenario['title']}_Report_$ts',
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -1088,7 +1266,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: context.surfaceModal,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                     color: Colors.red.withValues(alpha: 0.20), width: 1.2),
@@ -1111,37 +1289,37 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       color: Colors.red.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.error_outline,
+                    child: Icon(Icons.error_outline,
                         color: Colors.red, size: 28),
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Report Failed',
+                  SizedBox(height: 20),
+                  Text('Report Failed',
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.darkBase)),
-                  const SizedBox(height: 8),
-                  const Text('Could not generate the PDF report.',
+                          color: context.textPrimary)),
+                  SizedBox(height: 8),
+                  Text('Could not generate the PDF report.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
-                  const SizedBox(height: 8),
+                      style: TextStyle(fontSize: 13, color: context.textSecondary)),
+                  SizedBox(height: 8),
                   Text(e.toString(),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textLight,
+                          color: context.textTertiary,
                           height: 1.4)),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        color: AppColors.darkBase,
+                        color: context.textPrimary,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Text('Dismiss',
+                      child: Text('Dismiss',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 14,
@@ -1158,65 +1336,251 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     }
   }
 
-  void _showSaveDialog(BuildContext context, Color accentColor) {
-    final nameController = TextEditingController(
-      text:
-          '${widget.scenario['title']} – ${DateTime.now().day} ${_monthName(DateTime.now().month)} ${DateTime.now().year}',
-    );
+  Future<void> _showSaveDialog(BuildContext context, Color accentColor) async {
+    // ── Duplicate check ───────────────────────────────────────────────────────
+    final existing = await ScenarioService.loadScenarios();
+    if (!context.mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Save Scenario',
-            style: TextStyle(
-                fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Enter a name to save this simulation',
-                style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
-            const SizedBox(height: 12),
-            const Text('Scenario Name',
-                style: TextStyle(fontSize: 12, color: AppColors.textLight)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: nameController,
-              style: const TextStyle(fontSize: 14, color: AppColors.darkBase),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppColors.inputBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    final isDuplicate = existing.any((s) =>
+        s['scenario']?.toString() == widget.scenario['title']?.toString() &&
+        s['temperature']?.toString() == widget.temperature &&
+        s['pressure']?.toString() == widget.pressure &&
+        s['selectedValue']?.toString() == widget.selectedValue?.toString());
+
+    if (isDuplicate) {
+      final saveAgain = await showDialog<bool>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.35),
+        builder: (_) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: context.surfaceModal,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                    color: const Color(0xFFF39C12).withValues(alpha: 0.30),
+                    width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF39C12).withValues(alpha: 0.15),
+                    blurRadius: 40,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF39C12).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.bookmark_added_outlined,
+                        color: Color(0xFFF39C12), size: 28),
+                  ),
+                  SizedBox(height: 20),
+                  Text('Already Saved',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary)),
+                  SizedBox(height: 8),
+                  Text(
+                      'This simulation has already been saved. Do you want to save it again?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: context.textSecondary,
+                          height: 1.5)),
+                  SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(_, false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: context.inputBg,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text('Cancel',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.textSecondary)),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(_, true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF39C12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text('Save Again',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.red)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+      );
+      if (!context.mounted || saveAgain != true) return;
+    }
+
+    // ── Name dialog ───────────────────────────────────────────────────────────
+    final now = DateTime.now();
+    final nameController = TextEditingController(
+      text: '${widget.scenario['title']} – ${now.day} ${_monthName(now.month)} ${now.year}, '
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
+    );
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: context.surfaceModal,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                  color: accentColor.withValues(alpha: 0.20), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.12),
+                  blurRadius: 40,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) return;
-              Navigator.pop(context);
-              _saveScenario(context, name);
-            },
-            child: const Text('Save', style: TextStyle(color: Colors.white)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.bookmark_outline,
+                      color: accentColor, size: 26),
+                ),
+                SizedBox(height: 20),
+                Text('Save Scenario',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary)),
+                SizedBox(height: 8),
+                Text('Enter a name to save this simulation',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: context.textSecondary,
+                        height: 1.5)),
+                SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Scenario Name',
+                      style: TextStyle(
+                          fontSize: 12, color: context.textTertiary)),
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: nameController,
+                  style:
+                      TextStyle(fontSize: 14, color: context.textPrimary),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: context.inputBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                  ),
+                ),
+                SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: context.inputBg,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text('Cancel',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.textSecondary)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          Navigator.pop(context);
+                          _saveScenario(context, name);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text('Save',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1238,6 +1602,68 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   }
 
   Future<void> _saveScenario(BuildContext context, String name) async {
+    final accentColor = widget.scenario['color'] as Color;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            decoration: BoxDecoration(
+              color: context.surface.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                  color: accentColor.withValues(alpha: 0.18), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.18),
+                  blurRadius: 40,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: CircularProgressIndicator(
+                        color: accentColor, strokeWidth: 2.5),
+                  ),
+                ),
+                SizedBox(height: 20),
+                Text('Saving Scenario',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary)),
+                SizedBox(height: 8),
+                Text('Uploading your results, please wait…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: context.textSecondary,
+                        height: 1.5)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     try {
       final now = DateTime.now();
       final simId = 'SIM-${now.year}-${now.millisecondsSinceEpoch % 10000}';
@@ -1253,7 +1679,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           'temperature':   widget.temperature,
           'pressure':      widget.pressure,
           'scenario':      widget.scenario['title'],
-          'scenarioId':    widget.scenarioId,
+          'scenarioType':  widget.scenarioId,
           'selectedValue': widget.selectedValue,
           'useReservoir':  widget.useReservoir,
         },
@@ -1261,6 +1687,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       );
 
       if (!context.mounted) return;
+      Navigator.pop(context); // close loading dialog
       showDialog(
         context: context,
         builder: (_) => Material(
@@ -1270,7 +1697,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: context.surfaceModal,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                     color: const Color(0xFF2ECC71).withValues(alpha: 0.25),
@@ -1294,23 +1721,23 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       color: const Color(0xFF2ECC71).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check_circle_outline,
+                    child: Icon(Icons.check_circle_outline,
                         color: Color(0xFF2ECC71), size: 28),
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Scenario Saved',
+                  SizedBox(height: 20),
+                  Text('Scenario Saved',
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.darkBase)),
-                  const SizedBox(height: 8),
-                  const Text('Your simulation has been saved successfully.',
+                          color: context.textPrimary)),
+                  SizedBox(height: 8),
+                  Text('Your simulation has been saved successfully.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textMedium,
+                          color: context.textSecondary,
                           height: 1.5)),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   Row(
                     children: [
                       Expanded(
@@ -1319,19 +1746,19 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
-                              color: AppColors.inputBg,
+                              color: context.inputBg,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Text('Dismiss',
+                            child: Text('Dismiss',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textMedium)),
+                                    color: context.textSecondary)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: GestureDetector(
                           onTap: () => Navigator.pushAndRemoveUntil(
@@ -1349,10 +1776,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
-                              color: AppColors.darkBase,
+                              color: context.textPrimary,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Text('View Saved',
+                            child: Text('View Saved',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                     fontSize: 14,
@@ -1371,6 +1798,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       );
     } catch (e) {
       if (!context.mounted) return;
+      Navigator.pop(context); // close loading dialog
       showDialog(
         context: context,
         builder: (_) => Material(
@@ -1380,7 +1808,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: context.surfaceModal,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.20), width: 1.2),
                 boxShadow: [
@@ -1402,34 +1830,34 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       color: Colors.red.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.error_outline, color: Colors.red, size: 28),
+                    child: Icon(Icons.error_outline, color: Colors.red, size: 28),
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Save Failed',
+                  SizedBox(height: 20),
+                  Text('Save Failed',
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.darkBase)),
-                  const SizedBox(height: 8),
-                  const Text('Could not save the scenario.',
+                          color: context.textPrimary)),
+                  SizedBox(height: 8),
+                  Text('Could not save the scenario.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
-                  const SizedBox(height: 8),
+                      style: TextStyle(fontSize: 13, color: context.textSecondary)),
+                  SizedBox(height: 8),
                   Text(e.toString(),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textLight, height: 1.4)),
-                  const SizedBox(height: 24),
+                      style: TextStyle(
+                          fontSize: 11, color: context.textTertiary, height: 1.4)),
+                  SizedBox(height: 24),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        color: AppColors.darkBase,
+                        color: context.textPrimary,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Text('Dismiss',
+                      child: Text('Dismiss',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               fontSize: 14,
@@ -1485,37 +1913,18 @@ class _GlowActionButton extends StatefulWidget {
 class _GlowActionButtonState extends State<_GlowActionButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _borderProgress;
-  late Animation<double> _glowRadius;
-  bool _tapped = false;
+  double _scale = 1.0;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 600),
     );
-    _borderProgress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.65, curve: Curves.easeInOut)),
-    );
-    _glowRadius = Tween<double>(begin: 4.0, end: 20.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.65, curve: Curves.easeOut)),
-    );
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        widget.onTap();
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) {
-            _controller.reset();
-            setState(() => _tapped = false);
-          }
-        });
-      }
+    _controller.addListener(() {
+      setState(() => _scale = 1.0 - (_controller.value * 0.07));
     });
   }
 
@@ -1526,92 +1935,97 @@ class _GlowActionButtonState extends State<_GlowActionButton>
   }
 
   void _handleTap() {
-    if (_tapped) return;
-    setState(() => _tapped = true);
-    _controller.forward();
+    _controller.forward(from: 0.0).then((_) {
+      if (!mounted) return;
+      widget.onTap();
+      _controller.animateBack(0.0, curve: Curves.elasticOut);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _handleTap,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) => Stack(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [widget.accentColor, AppColors.primaryBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.accentColor.withValues(alpha: 0.45),
-                    blurRadius: _glowRadius.value,
-                    spreadRadius: _glowRadius.value * 0.15,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(widget.icon, color: Colors.white, size: 22),
-                  const SizedBox(height: 4),
-                  Text(widget.label,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
-                ],
-              ),
+      child: Transform.scale(
+        scale: _scale,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [widget.accentColor, AppColors.primaryBlue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _BorderDrawPainter(
-                  progress: _borderProgress.value,
-                  color: widget.accentColor,
-                  radius: 16,
-                ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: widget.accentColor.withValues(alpha: 0.40),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            children: [
+              Icon(widget.icon, color: context.surface, size: 22),
+              SizedBox(height: 4),
+              Text(widget.label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _BorderDrawPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final double radius;
+// ── Chart data model ────────────────────────────────────────────────────────
 
-  _BorderDrawPainter(
-      {required this.progress, required this.color, this.radius = 30});
+class _ChartSeries {
+  final List<FlSpot> spots;
+  final String label;
+  final Color color;
+  final bool dashed;
+  const _ChartSeries({
+    required this.spots,
+    required this.label,
+    required this.color,
+    required this.dashed,
+  });
+}
+
+// ── Legend painter ──────────────────────────────────────────────────────────
+
+class _LineLegendPainter extends CustomPainter {
+  final Color color;
+  final bool dashed;
+  const _LineLegendPainter({required this.color, required this.dashed});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress == 0) return;
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        Radius.circular(radius),
-      ));
-    final metrics = path.computeMetrics().first;
-    canvas.drawPath(metrics.extractPath(0, metrics.length * progress), paint);
+      ..color = color
+      ..strokeWidth = dashed ? 1.8 : 2.5
+      ..style = PaintingStyle.stroke;
+    if (dashed) {
+      double x = 0;
+      bool draw = true;
+      while (x < size.width) {
+        final end = math.min(x + 5, size.width);
+        if (draw) canvas.drawLine(Offset(x, size.height / 2), Offset(end, size.height / 2), paint);
+        x += draw ? 5 : 3;
+        draw = !draw;
+      }
+    } else {
+      canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), paint);
+    }
   }
 
   @override
-  bool shouldRepaint(_BorderDrawPainter old) => old.progress != progress;
+  bool shouldRepaint(_LineLegendPainter old) => false;
 }
+

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../widgets/simulation_card.dart';
 import 'simulation_detail_screen.dart';
 import 'co2_assessment_screen.dart';
@@ -17,35 +18,30 @@ class _Co2AssessmentCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: green.withValues(alpha: 0.20), width: 1.2),
-          boxShadow: [
-            BoxShadow(color: green.withValues(alpha: 0.10), blurRadius: 18, offset: const Offset(0, 5)),
-          ],
+          boxShadow: [BoxShadow(color: green.withValues(alpha: 0.10), blurRadius: 18, offset: const Offset(0, 5))],
         ),
         child: Row(
           children: [
             Container(
               width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: green.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration: BoxDecoration(color: green.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
               child: const Icon(Icons.co2_outlined, color: green, size: 22),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('CO₂ Assessment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                  SizedBox(height: 3),
-                  Text('PETE geological CO₂ storage feasibility', style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                  Text('CO₂ Assessment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                  const SizedBox(height: 3),
+                  Text('PETE geological CO₂ storage feasibility', style: TextStyle(fontSize: 12, color: context.textTertiary)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textLight),
+            Icon(Icons.arrow_forward_ios, size: 14, color: context.textTertiary),
           ],
         ),
       ),
@@ -76,6 +72,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       'reactionBasis': 'Primary cracking reaction of ethane only.',
       'icon': Icons.bubble_chart_outlined,
       'color': AppColors.cyan,
+      'schematic': 'assets/images/Ethane-cracking.jpeg',
     },
     {
       'scenarioNumber': 'Scenario 2',
@@ -86,6 +83,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       'reactionBasis': 'Primary and secondary cracking reactions.',
       'icon': Icons.account_tree_outlined,
       'color': AppColors.purple,
+      'schematic': 'assets/images/Ethane-cracking.jpeg',
     },
     {
       'scenarioNumber': 'Scenario 3',
@@ -96,6 +94,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       'reactionBasis': 'Complete reaction network.',
       'icon': Icons.hub_outlined,
       'color': AppColors.midTone,
+      'schematic': 'assets/images/Ethane-cracking.jpeg',
     },
   ];
 
@@ -148,8 +147,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -157,9 +155,27 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 28),
-                const Text('Workspace', style: AppTextStyles.heading1),
-                const SizedBox(height: 6),
-                const Text('Select a scenario to begin your simulation', style: AppTextStyles.body),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Workspace', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                          const SizedBox(height: 6),
+                          Text('Select a scenario to begin your simulation', style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    Image.asset(
+                      'assets/images/Transparent_logo.png',
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.contain,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 28),
                 Expanded(
                   child: ListView(

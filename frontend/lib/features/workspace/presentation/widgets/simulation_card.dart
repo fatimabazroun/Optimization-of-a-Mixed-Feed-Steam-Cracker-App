@@ -33,10 +33,7 @@ class _SimulationCardState extends State<SimulationCard>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-    );
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
     _scale = Tween<double>(begin: 1.0, end: 0.97).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
@@ -52,10 +49,7 @@ class _SimulationCardState extends State<SimulationCard>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onTap();
-      },
+      onTapUp: (_) { _controller.reverse(); widget.onTap(); },
       onTapCancel: () => _controller.reverse(),
       child: AnimatedBuilder(
         animation: _scale,
@@ -64,22 +58,15 @@ class _SimulationCardState extends State<SimulationCard>
           margin: const EdgeInsets.only(bottom: 14),
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.surface,
             borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryBlue.withValues(alpha: 0.07),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: context.cardShadow, blurRadius: 16, offset: const Offset(0, 4))],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 48, height: 48,
                 decoration: BoxDecoration(
                   color: widget.iconColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
@@ -91,73 +78,34 @@ class _SimulationCardState extends State<SimulationCard>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Scenario number badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: widget.iconColor.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
-                        widget.scenarioNumber,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: widget.iconColor,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
+                      child: Text(widget.scenarioNumber,
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: widget.iconColor, letterSpacing: 0.2)),
                     ),
                     const SizedBox(height: 6),
-                    // Title
-                    Text(
-                      widget.title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.darkBase,
-                      ),
-                    ),
+                    Text(widget.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
                     const SizedBox(height: 3),
-                    // Tagline
-                    Text(
-                      widget.tagline,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMedium,
-                        height: 1.4,
-                      ),
-                    ),
+                    Text(widget.tagline, style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.4)),
                     const SizedBox(height: 8),
-                    // Reaction basis row
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.science_outlined, size: 12, color: AppColors.textLight),
+                        Icon(Icons.science_outlined, size: 12, color: context.textTertiary),
                         const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            widget.reactionBasis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textLight,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
+                        Expanded(child: Text(widget.reactionBasis,
+                            style: TextStyle(fontSize: 11, color: context.textTertiary, height: 1.3))),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Text(
-                          'Open Simulation',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: widget.iconColor,
-                          ),
-                        ),
+                        Flexible(child: Text('Open Simulation',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: widget.iconColor))),
                         const SizedBox(width: 2),
                         Icon(Icons.arrow_forward_ios, size: 10, color: widget.iconColor),
                       ],
@@ -165,7 +113,7 @@ class _SimulationCardState extends State<SimulationCard>
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.textLight, size: 20),
+              Icon(Icons.chevron_right, color: context.textTertiary, size: 20),
             ],
           ),
         ),

@@ -1,6 +1,8 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
+import '../../../../shared/widgets/field_info_tooltip.dart';
 import '../../../../core/services/simulation_service.dart';
 import 'co2_assessment_results_screen.dart';
 
@@ -46,10 +48,36 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
   final _totalCompCtrl = TextEditingController();
   final _wellboreRadiusCtrl = TextEditingController();
   final _skinFactorCtrl = TextEditingController();
+  final _co2SaturationCtrl = TextEditingController();
+  final _logStartTimeCtrl = TextEditingController();
   final _closedMultCtrl = TextEditingController();
 
   final Set<String> _errorFields = {};
+  final Map<String, String> _fieldRangeErrors = {};
+  final Map<String, String> _liveRangeErrors = {};
   bool _running = false;
+
+  static const _fieldRanges = <String, (double, double)>{
+    'co2_rate':       (0.001,  10000),
+    'proj_duration':  (1,      50),
+    'n_wells':        (1,      10),
+    'depth':          (800,    3000),
+    'init_pressure':  (5,      50),
+    'permeability':   (0.1,    1000),
+    'thickness':      (5,      100),
+    'porosity':       (0.05,   0.4),
+    'res_radius':     (500,    10000),
+    'frac_gradient':  (0.015,  0.025),
+    'safety_margin':  (1,      5),
+    'co2_density':    (500,    900),
+    'co2_viscosity':  (0.03,   0.1),
+    'co2_saturation': (0.05,   0.6),
+    'total_comp':     (1e-5,   1e-3),
+    'wellbore_radius':(0.05,   0.3),
+    'skin':           (-5,     20),
+    'closed_mult':    (1,      5),
+    'log_start_time': (0.1,   10),
+  };
   bool _showValidationBanner = false;
   String? _runError;
 
@@ -64,11 +92,13 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
     _fadeController.forward();
 
     _safetyMarginCtrl.text = '1.5';
+    _logStartTimeCtrl.text = '1';
     _co2DensityCtrl.text = '700';
     _co2ViscosityCtrl.text = '0.05';
     _totalCompCtrl.text = '0.0001';
     _wellboreRadiusCtrl.text = '0.1';
     _skinFactorCtrl.text = '0';
+    _co2SaturationCtrl.text = '0.2';
     _closedMultCtrl.text = '3';
 
     final listeners = <TextEditingController, String>{
@@ -83,11 +113,35 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
       _reservoirRadiusCtrl: 'res_radius',
       _fracPressureCtrl: 'frac_pressure',
       _fracGradientCtrl: 'frac_gradient',
+      _safetyMarginCtrl: 'safety_margin',
+      _co2DensityCtrl: 'co2_density',
+      _co2ViscosityCtrl: 'co2_viscosity',
+      _totalCompCtrl: 'total_comp',
+      _wellboreRadiusCtrl: 'wellbore_radius',
+      _skinFactorCtrl: 'skin',
+      _co2SaturationCtrl: 'co2_saturation',
+      _logStartTimeCtrl: 'log_start_time',
+      _closedMultCtrl: 'closed_mult',
     };
     for (final e in listeners.entries) {
       final key = e.value;
+      final range = _fieldRanges[key];
       e.key.addListener(() {
-        if (_errorFields.contains(key)) setState(() => _errorFields.remove(key));
+        setState(() {
+          _errorFields.remove(key);
+          _fieldRangeErrors.remove(key);
+          final text = e.key.text.trim();
+          if (range != null && text.isNotEmpty) {
+            final v = double.tryParse(text);
+            if (v != null && (v < range.$1 || v > range.$2)) {
+              _liveRangeErrors[key] = '${range.$1} – ${range.$2}';
+            } else {
+              _liveRangeErrors.remove(key);
+            }
+          } else {
+            _liveRangeErrors.remove(key);
+          }
+        });
       });
     }
     _fracPressureCtrl.addListener(() => setState(() => _errorFields.remove('frac_gradient')));
@@ -114,6 +168,8 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
     _totalCompCtrl.dispose();
     _wellboreRadiusCtrl.dispose();
     _skinFactorCtrl.dispose();
+    _co2SaturationCtrl.dispose();
+    _logStartTimeCtrl.dispose();
     _closedMultCtrl.dispose();
     super.dispose();
   }
@@ -125,36 +181,70 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
 
   bool _validate() {
     _errorFields.clear();
+    _fieldRangeErrors.clear();
 
-    final co2Rate = _parse(_co2RateCtrl);
-    if (co2Rate == null || co2Rate <= 0) _errorFields.add('co2_rate');
+    String fmt(double v) =>
+        v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
 
-    final requiredPositive = <String, TextEditingController>{
-      'proj_duration': _projDurationCtrl,
-      'n_wells': _numWellsCtrl,
-      'depth': _depthCtrl,
-      'init_pressure': _initPressureCtrl,
-      'permeability': _permeabilityCtrl,
-      'thickness': _thicknessCtrl,
-      'res_radius': _reservoirRadiusCtrl,
-    };
-    for (final e in requiredPositive.entries) {
-      final v = _parse(e.value);
-      if (v == null || v <= 0) _errorFields.add(e.key);
+    void req(String key, double? v, double min, double max) {
+      if (v == null) { _errorFields.add(key); return; }
+      if (v < min || v > max) {
+        _errorFields.add(key);
+        _fieldRangeErrors[key] = 'entered ${fmt(v)}, valid $min – $max';
+      }
     }
 
-    final phi = _parse(_porosityCtrl);
-    if (phi == null || phi < 0 || phi > 1) _errorFields.add('porosity');
+    void opt(String key, TextEditingController ctrl, double min, double max) {
+      if (ctrl.text.trim().isEmpty) return;
+      final v = _parse(ctrl);
+      if (v == null || v < min || v > max) {
+        _errorFields.add(key);
+        if (v != null) _fieldRangeErrors[key] = 'entered ${fmt(v)}, valid $min – $max';
+      }
+    }
 
+    // CO₂ rate: > 0, max 10 000
+    final co2Rate = _parse(_co2RateCtrl);
+    if (co2Rate == null || co2Rate <= 0) {
+      _errorFields.add('co2_rate');
+    } else if (co2Rate > 10000) {
+      _errorFields.add('co2_rate');
+      _fieldRangeErrors['co2_rate'] = 'entered ${fmt(co2Rate)}, valid > 0 – 10,000';
+    }
+
+    req('proj_duration', _parse(_projDurationCtrl), 1,    50);
+    req('n_wells',       _parse(_numWellsCtrl),      1,    10);
+    req('depth',         _parse(_depthCtrl),          800,  3000);
+    req('init_pressure', _parse(_initPressureCtrl),   5,    50);
+    req('permeability',  _parse(_permeabilityCtrl),   0.1,  1000);
+    req('thickness',     _parse(_thicknessCtrl),      5,    100);
+    req('porosity',      _parse(_porosityCtrl),       0.05, 0.4);
+    req('res_radius',    _parse(_reservoirRadiusCtrl),500,  10000);
+
+    // Fracture pressure / gradient
     final hasFracP = _fracPressureCtrl.text.trim().isNotEmpty;
     final hasFracG = _fracGradientCtrl.text.trim().isNotEmpty;
     if (!hasFracP && !hasFracG) {
       _errorFields.add('frac_pressure');
       _errorFields.add('frac_gradient');
     } else {
-      if (hasFracP && (_parse(_fracPressureCtrl) ?? 0) <= 0) _errorFields.add('frac_pressure');
-      if (hasFracG && (_parse(_fracGradientCtrl) ?? 0) <= 0) _errorFields.add('frac_gradient');
+      if (hasFracP) {
+        final v = _parse(_fracPressureCtrl);
+        if (v == null || v <= 0) _errorFields.add('frac_pressure');
+      }
+      if (hasFracG) opt('frac_gradient', _fracGradientCtrl, 0.015, 0.025);
     }
+
+    // Optional advanced — always pre-filled with defaults so always validated
+    opt('safety_margin',  _safetyMarginCtrl,  1,    5);
+    opt('co2_density',    _co2DensityCtrl,    500,  900);
+    opt('co2_viscosity',  _co2ViscosityCtrl,  0.03, 0.1);
+    opt('co2_saturation', _co2SaturationCtrl, 0.05, 0.6);
+    opt('total_comp',     _totalCompCtrl,     1e-5, 1e-3);
+    opt('wellbore_radius',_wellboreRadiusCtrl,0.05, 0.3);
+    opt('skin',           _skinFactorCtrl,    -5,   20);
+    opt('log_start_time', _logStartTimeCtrl,  0.1,  10);
+    if (_reservoirType == 'Closed') opt('closed_mult', _closedMultCtrl, 1, 5);
 
     return _errorFields.isEmpty;
   }
@@ -186,6 +276,10 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
         'well_radius': _parse(_wellboreRadiusCtrl)!,
       if (_skinFactorCtrl.text.trim().isNotEmpty)
         'skin': _parse(_skinFactorCtrl)!,
+      if (_co2SaturationCtrl.text.trim().isNotEmpty)
+        'co2_saturation': _parse(_co2SaturationCtrl)!,
+      if (_logStartTimeCtrl.text.trim().isNotEmpty)
+        'log_start_time': _parse(_logStartTimeCtrl)!,
       if (_reservoirType == 'Closed' && _closedMultCtrl.text.trim().isNotEmpty)
         'closed_multiplier': _parse(_closedMultCtrl)!,
     };
@@ -218,8 +312,7 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fade,
@@ -230,11 +323,11 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                        Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
                         SizedBox(width: 4),
-                        Text('Back to Workspace', style: AppTextStyles.body),
+                        Text('Back to Workspace', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
@@ -256,25 +349,25 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                                 color: _green.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(Icons.co2_outlined, color: _green, size: 22),
+                              child: Icon(Icons.co2_outlined, color: _green, size: 22),
                             ),
-                            const SizedBox(width: 14),
-                            const Expanded(
+                            SizedBox(width: 14),
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('CO₂ Assessment', style: AppTextStyles.heading1),
-                                  Text('PETE geological storage feasibility', style: AppTextStyles.body),
+                                  Text('CO₂ Assessment', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                                  Text('PETE geological storage feasibility', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 28),
+                        SizedBox(height: 28),
 
                         // CO₂ rate input
                         _sectionTitle('CO₂ Rate'),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _sectionCard(
                           child: _peteField(
                             label: 'CO₂ emission rate (q_CO₂)',
@@ -286,11 +379,11 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        SizedBox(height: 24),
 
                         // A. Project Inputs
                         _peteSubHeader('A', 'Project Inputs'),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _sectionCard(
                           child: Column(
                             children: [
@@ -299,62 +392,64 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                                 unit: 'years',
                                 controller: _projDurationCtrl,
                                 fieldKey: 'proj_duration',
+                                description: '1 – 50 years. Total planned CO₂ injection period. Determines how long pressure and plume radius are simulated.',
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               _peteField(
                                 label: 'Number of wells (N_w)',
                                 unit: '–',
                                 controller: _numWellsCtrl,
                                 fieldKey: 'n_wells',
                                 keyboardType: TextInputType.number,
+                                description: '1 – 10. Total injection wells. CO₂ flow rate is split equally across all wells.',
                               ),
                             ],
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
 
                         // B. Reservoir Inputs
                         _peteSubHeader('B', 'Reservoir Inputs'),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _sectionCard(
                           child: Column(
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: _peteField(label: 'Depth (D)', unit: 'm', controller: _depthCtrl, fieldKey: 'depth')),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _peteField(label: 'Initial pressure (P_i)', unit: 'MPa', controller: _initPressureCtrl, fieldKey: 'init_pressure')),
+                                  Expanded(child: _peteField(label: 'Depth (D)', unit: 'm', controller: _depthCtrl, fieldKey: 'depth', description: '800 – 3000 m. Vertical depth to the reservoir. Deeper reservoirs generally have higher pressures and better containment.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'Initial pressure (P_i)', unit: 'MPa', controller: _initPressureCtrl, fieldKey: 'init_pressure', description: '5 – 50 MPa. Reservoir pressure before CO₂ injection begins. Used as the baseline for pressure build-up calculations.')),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               Row(
                                 children: [
-                                  Expanded(child: _peteField(label: 'Permeability (k)', unit: 'mD', controller: _permeabilityCtrl, fieldKey: 'permeability')),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _peteField(label: 'Thickness (h)', unit: 'm', controller: _thicknessCtrl, fieldKey: 'thickness')),
+                                  Expanded(child: _peteField(label: 'Permeability (k)', unit: 'mD', controller: _permeabilityCtrl, fieldKey: 'permeability', description: '0.1 – 1000 mD. Rock\'s ability to allow fluid flow. Higher permeability means CO₂ spreads more easily and pressure builds more slowly.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'Thickness (h)', unit: 'm', controller: _thicknessCtrl, fieldKey: 'thickness', description: '5 – 100 m. Net pay thickness of the injection zone. Thicker zones can store more CO₂ at lower pressure.')),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               Row(
                                 children: [
-                                  Expanded(child: _peteField(label: 'Porosity (ϕ)', unit: '–', controller: _porosityCtrl, fieldKey: 'porosity', hint: '0 – 1')),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _peteField(label: 'Reservoir radius (r_e)', unit: 'm', controller: _reservoirRadiusCtrl, fieldKey: 'res_radius')),
+                                  Expanded(child: _peteField(label: 'Porosity (ϕ)', unit: '–', controller: _porosityCtrl, fieldKey: 'porosity', hint: '0 – 1', description: '0.05 – 0.4. Fraction of rock volume that is pore space. Higher porosity means greater storage capacity.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'Reservoir radius (r_e)', unit: 'm', controller: _reservoirRadiusCtrl, fieldKey: 'res_radius', description: '500 – 10000 m. Outer boundary radius of the reservoir. Used to determine whether the CO₂ plume stays within safe limits.')),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      const Text('Reservoir type', style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                                      Text('Reservoir type', style: TextStyle(fontSize: 12, color: context.textTertiary)),
                                       const Spacer(),
                                       _badge('Required'),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
+                                  SizedBox(height: 8),
                                   _glassDropdown(),
                                 ],
                               ),
@@ -362,11 +457,11 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
 
                         // C. Pressure Constraint
                         _peteSubHeader('C', 'Pressure Constraint'),
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Row(
@@ -377,10 +472,10 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                                   color: _green.withValues(alpha: 0.10),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Text('Either / Or', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _green)),
+                                child: Text('Either / Or', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _green)),
                               ),
-                              const SizedBox(width: 8),
-                              const Text('Provide at least one of the two fields below', style: TextStyle(fontSize: 11, color: AppColors.textLight)),
+                              SizedBox(width: 8),
+                              Text('Provide at least one of the two fields below', style: TextStyle(fontSize: 11, color: context.textTertiary)),
                             ],
                           ),
                         ),
@@ -394,8 +489,9 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                                 fieldKey: 'frac_pressure',
                                 isRequired: false,
                                 badgeLabel: 'Either / Or',
+                                description: 'Maximum allowable bottomhole pressure before the rock fractures. Injection must stay below this to avoid caprock damage. Provide this OR fracture gradient.',
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               _peteField(
                                 label: 'Fracture gradient (G_f)',
                                 unit: 'MPa/m',
@@ -403,73 +499,73 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                                 fieldKey: 'frac_gradient',
                                 isRequired: false,
                                 badgeLabel: 'Either / Or',
-                              ),
-                              const SizedBox(height: 14),
-                              _peteField(
-                                label: 'Safety margin (ΔP_safe)',
-                                unit: 'MPa',
-                                controller: _safetyMarginCtrl,
-                                isRequired: false,
-                                badgeLabel: 'Optional',
-                                hint: 'default: 1.5',
-                                description: 'Pressure buffer kept below the fracture limit to avoid reservoir damage.',
+                                description: '0.015 – 0.025 MPa/m. Fracture pressure per unit depth. The app multiplies this by depth to compute the fracture pressure limit. Provide this OR fracture pressure.',
                               ),
                             ],
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
 
                         // D. Advanced Inputs
                         _peteSubHeader('D', 'Advanced Inputs'),
-                        const SizedBox(height: 6),
-                        const Padding(
+                        SizedBox(height: 6),
+                        Padding(
                           padding: EdgeInsets.only(bottom: 12),
-                          child: Text('All fields optional — leave blank to use defaults', style: TextStyle(fontSize: 11, color: AppColors.textLight)),
+                          child: Text('All fields optional — leave blank to use defaults', style: TextStyle(fontSize: 11, color: context.textTertiary)),
                         ),
                         _sectionCard(
                           child: Column(
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: _peteField(label: 'CO₂ density (ρ)', unit: 'kg/m³', controller: _co2DensityCtrl, isRequired: false, badgeLabel: 'Optional', hint: 'default: 700', description: 'CO₂ density at reservoir conditions.')),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _peteField(label: 'CO₂ viscosity (μ)', unit: 'cP', controller: _co2ViscosityCtrl, isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.05', description: 'CO₂ viscosity at reservoir T and P.')),
+                                  Expanded(child: _peteField(label: 'CO₂ density (ρ)', unit: 'kg/m³', controller: _co2DensityCtrl, fieldKey: 'co2_density', isRequired: false, badgeLabel: 'Optional', hint: 'default: 700', description: '500 – 900 kg/m³. CO₂ density at reservoir conditions.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'CO₂ viscosity (μ)', unit: 'cP', controller: _co2ViscosityCtrl, fieldKey: 'co2_viscosity', isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.05', description: '0.03 – 0.1 cP. CO₂ viscosity at reservoir T and P.')),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               Row(
                                 children: [
-                                  Expanded(child: _peteField(label: 'Total compressibility (c_t)', unit: '1/MPa', controller: _totalCompCtrl, isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.0001', description: 'Combined compressibility of rock and fluids.')),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _peteField(label: 'Wellbore radius (r_w)', unit: 'm', controller: _wellboreRadiusCtrl, isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.1', description: 'Physical radius of the injection well.')),
+                                  Expanded(child: _peteField(label: 'Total compressibility (c_t)', unit: '1/MPa', controller: _totalCompCtrl, fieldKey: 'total_comp', isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.0001', description: '1e-5 – 1e-3 /MPa. Combined compressibility of rock and fluids.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'Wellbore radius (r_w)', unit: 'm', controller: _wellboreRadiusCtrl, fieldKey: 'wellbore_radius', isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.1', description: '0.05 – 0.3 m. Physical radius of the injection well.')),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               Row(
                                 children: [
-                                  Expanded(child: _peteField(label: 'Skin factor (s)', unit: '–', controller: _skinFactorCtrl, isRequired: false, badgeLabel: 'Optional', hint: 'default: 0', description: '0 = undamaged. Positive = damage; negative = stimulation.')),
-                                  const SizedBox(width: 12),
-                                  const Expanded(child: SizedBox()),
+                                  Expanded(child: _peteField(label: 'Skin factor (s)', unit: '–', controller: _skinFactorCtrl, fieldKey: 'skin', isRequired: false, badgeLabel: 'Optional', hint: 'default: 0', description: '-5 – 20. 0 = undamaged. Positive = damage; negative = stimulation.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'CO₂ saturation (S_CO₂)', unit: '–', controller: _co2SaturationCtrl, fieldKey: 'co2_saturation', isRequired: false, badgeLabel: 'Optional', hint: 'default: 0.2', description: '0.05 – 0.6. Effective CO₂ saturation in pore space. Used to estimate plume radius.')),
+                                ],
+                              ),
+                              SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(child: _peteField(label: 'Safety margin (ΔP_safe)', unit: 'MPa', controller: _safetyMarginCtrl, fieldKey: 'safety_margin', isRequired: false, badgeLabel: 'Optional', hint: 'default: 1.5', description: '1 – 5 MPa. Pressure buffer below fracture limit.')),
+                                  SizedBox(width: 12),
+                                  Expanded(child: _peteField(label: 'Log start time (t₀)', unit: 'days', controller: _logStartTimeCtrl, fieldKey: 'log_start_time', isRequired: false, badgeLabel: 'Optional', hint: 'default: 1', description: '0.1 – 10 days. Lower bound to avoid log(0) at early time.')),
                                 ],
                               ),
                               if (_reservoirType == 'Closed') ...[
-                                const SizedBox(height: 14),
+                                SizedBox(height: 14),
                                 _peteField(
                                   label: 'Closed multiplier (α)',
                                   unit: '–',
                                   controller: _closedMultCtrl,
+                                  fieldKey: 'closed_mult',
                                   isRequired: false,
                                   badgeLabel: 'Optional',
                                   hint: 'default: 3',
-                                  description: 'Multiplier for closed boundary effects.',
+                                  description: '1 – 5. Pressure buildup multiplier for closed boundary.',
                                 ),
                               ],
                             ],
                           ),
                         ),
 
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32),
 
                         // Validation banner
                         if (_showValidationBanner) _validationBanner(),
@@ -477,11 +573,11 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                         // Run button
                         _RunButton(running: _running, onTap: _runAssessment),
 
-                        const SizedBox(height: 24),
+                        SizedBox(height: 24),
 
                         if (_runError != null) _errorCard(_runError!),
 
-                        const SizedBox(height: 48),
+                        SizedBox(height: 48),
                       ],
                     ),
                   ),
@@ -498,16 +594,16 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
 
   Widget _sectionTitle(String title) => Text(
         title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.darkBase),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.textPrimary),
       );
 
   Widget _sectionCard({required Widget child}) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.surface,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
-            BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.07), blurRadius: 16, offset: const Offset(0, 4)),
+            BoxShadow(color: context.cardShadow, blurRadius: 16, offset: const Offset(0, 4)),
           ],
         ),
         child: child,
@@ -519,10 +615,10 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
             width: 26,
             height: 26,
             decoration: BoxDecoration(color: _green.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(7)),
-            child: Center(child: Text(letter, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _green))),
+            child: Center(child: Text(letter, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _green))),
           ),
-          const SizedBox(width: 10),
-          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
+          SizedBox(width: 10),
+          Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
         ],
       );
 
@@ -548,8 +644,10 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
     TextInputType keyboardType = const TextInputType.numberWithOptions(decimal: true, signed: true),
   }) {
     final hasError = fieldKey != null && _errorFields.contains(fieldKey);
+    final liveRange = fieldKey != null ? _liveRangeErrors[fieldKey] : null;
     const errorRed = Color(0xFFE74C3C);
-    final accent = hasError ? errorRed : _green;
+    final hasLiveError = liveRange != null;
+    final accent = (hasError || hasLiveError) ? errorRed : _green;
     final hintText = hint ?? (unit != '–' ? unit : 'Enter value');
 
     return Column(
@@ -558,10 +656,11 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
         Row(
           children: [
             Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: hasError ? errorRed : AppColors.textLight))),
+            if (description != null) FieldInfoTooltip(description: description),
             _badge(badgeLabel, isRequired: isRequired),
           ],
         ),
-        const SizedBox(height: 7),
+        SizedBox(height: 7),
         ClipRRect(
           borderRadius: BorderRadius.circular(13),
           child: BackdropFilter(
@@ -588,7 +687,10 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: accent),
                 decoration: InputDecoration(
                   hintText: hintText,
-                  hintStyle: TextStyle(fontSize: 12, color: AppColors.textLight.withValues(alpha: 0.65), fontWeight: FontWeight.w400),
+                  hintStyle: TextStyle(fontSize: 12, color: context.textTertiary.withValues(alpha: 0.65), fontWeight: FontWeight.w400),
+                  suffix: unit != '–'
+                      ? Text(unit, style: TextStyle(fontSize: 11, color: context.textTertiary.withValues(alpha: 0.75), fontWeight: FontWeight.w500))
+                      : null,
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -600,11 +702,17 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
             ),
           ),
         ),
-        if (description != null) ...[
-          const SizedBox(height: 5),
+        if (hasLiveError) ...[
+          SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 4),
-            child: Text(description, style: TextStyle(fontSize: 10.5, color: AppColors.textLight.withValues(alpha: 0.8), height: 1.4)),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, size: 11, color: Color(0xFFE74C3C)),
+                SizedBox(width: 4),
+                Expanded(child: Text('Valid range: $liveRange', style: TextStyle(fontSize: 10.5, color: Color(0xFFE74C3C), fontWeight: FontWeight.w600, height: 1.4))),
+              ],
+            ),
           ),
         ],
       ],
@@ -632,8 +740,8 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
                 value: _reservoirType,
                 isExpanded: true,
                 dropdownColor: const Color(0xFFF0F4FF).withValues(alpha: 0.97),
-                icon: const Icon(Icons.keyboard_arrow_down, color: _green, size: 18),
-                style: const TextStyle(fontSize: 14, color: _green, fontWeight: FontWeight.w600),
+                icon: Icon(Icons.keyboard_arrow_down, color: _green, size: 18),
+                style: TextStyle(fontSize: 14, color: _green, fontWeight: FontWeight.w600),
                 items: ['Open', 'Closed'].map((v) => DropdownMenuItem(
                   value: v,
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(v)),
@@ -646,25 +754,40 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
       );
 
   static const _fieldLabels = {
-    'co2_rate': 'CO₂ emission rate',
+    'co2_rate':      'CO₂ emission rate',
     'proj_duration': 'Project duration',
-    'n_wells': 'Number of wells',
-    'depth': 'Depth',
+    'n_wells':       'Number of wells',
+    'depth':         'Depth',
     'init_pressure': 'Initial pressure',
-    'permeability': 'Permeability',
-    'thickness': 'Thickness',
-    'porosity': 'Porosity',
-    'res_radius': 'Reservoir radius',
+    'permeability':  'Permeability',
+    'thickness':     'Thickness',
+    'porosity':      'Porosity',
+    'res_radius':    'Reservoir radius',
     'frac_pressure': 'Fracture pressure',
     'frac_gradient': 'Fracture gradient',
+    'safety_margin': 'Safety margin',
+    'co2_density':   'CO₂ density',
+    'co2_viscosity': 'CO₂ viscosity',
+    'co2_saturation':'CO₂ saturation',
+    'total_comp':    'Total compressibility',
+    'wellbore_radius':'Wellbore radius',
+    'skin':          'Skin factor',
+    'closed_mult':    'Closed multiplier',
+    'log_start_time': 'Log start time',
   };
 
   Widget _validationBanner() {
-    final missing = _errorFields
-        .map((k) => _fieldLabels[k] ?? k)
-        .toSet()
-        .toList()
-      ..sort();
+    final missing = <String>[];
+    final outOfRange = <String>[];
+
+    for (final key in _errorFields) {
+      final label = _fieldLabels[key] ?? key;
+      if (_fieldRangeErrors.containsKey(key)) {
+        outOfRange.add('$label: ${_fieldRangeErrors[key]}');
+      } else {
+        missing.add(label);
+      }
+    }
 
     // frac pressure/gradient share one logical requirement
     final hasBothFrac = missing.contains('Fracture pressure') && missing.contains('Fracture gradient');
@@ -674,12 +797,25 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
         ..remove('Fracture gradient')
         ..add('Fracture pressure or Fracture gradient (at least one)');
     }
+    missing.sort();
+    outOfRange.sort();
+
+    Widget bulletRow(String text) => Padding(
+      padding: const EdgeInsets.only(bottom: 4, left: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('• ', style: TextStyle(fontSize: 12, color: _red)),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.4))),
+        ],
+      ),
+    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _red.withValues(alpha: 0.30), width: 1.2),
         boxShadow: [BoxShadow(color: _red.withValues(alpha: 0.10), blurRadius: 16, offset: const Offset(0, 4))],
@@ -687,24 +823,25 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: _red, size: 18),
               SizedBox(width: 8),
-              Text('Please complete the required fields', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _red)),
+              Text('Fix the following before running', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _red)),
             ],
           ),
-          const SizedBox(height: 10),
-          ...missing.map((label) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('• ', style: TextStyle(fontSize: 12, color: _red)),
-                Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.4))),
-              ],
-            ),
-          )),
+          if (missing.isNotEmpty) ...[
+            SizedBox(height: 10),
+            Text('Missing', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.textTertiary)),
+            SizedBox(height: 4),
+            ...missing.map(bulletRow),
+          ],
+          if (outOfRange.isNotEmpty) ...[
+            SizedBox(height: 10),
+            Text('Out of range', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.textTertiary)),
+            SizedBox(height: 4),
+            ...outOfRange.map(bulletRow),
+          ],
         ],
       ),
     );
@@ -714,7 +851,7 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _red.withValues(alpha: 0.25), width: 1.2),
           boxShadow: [BoxShadow(color: _red.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 6))],
@@ -724,16 +861,16 @@ class _Co2AssessmentScreenState extends State<Co2AssessmentScreen>
             Container(
               width: 36, height: 36,
               decoration: BoxDecoration(color: _red.withValues(alpha: 0.10), shape: BoxShape.circle),
-              child: const Icon(Icons.error_outline, color: _red, size: 20),
+              child: Icon(Icons.error_outline, color: _red, size: 20),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Assessment Failed', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.darkBase)),
-                  const SizedBox(height: 4),
-                  Text(message, style: const TextStyle(fontSize: 12, color: AppColors.textMedium, height: 1.4)),
+                  Text('Assessment Failed', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                  SizedBox(height: 4),
+                  Text(message, style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.4)),
                 ],
               ),
             ),
@@ -779,13 +916,13 @@ class _RunButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (running)
-                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: context.surface, strokeWidth: 2))
                 else
-                  const Icon(Icons.analytics_outlined, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
+                  Icon(Icons.analytics_outlined, color: context.surface, size: 20),
+                SizedBox(width: 10),
                 Text(
                   running ? 'Running Assessment…' : 'Run CO₂ Assessment',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
               ],
             ),

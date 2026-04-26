@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -59,8 +60,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -74,11 +74,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textMedium),
+                        Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
                         SizedBox(width: 4),
-                        Text('Back', style: AppTextStyles.body),
+                        Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
@@ -88,7 +88,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: AppColors.cyan.withOpacity(0.12),
+                        color: AppColors.cyan.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.lock_reset_outlined,
@@ -96,11 +96,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Forgot Password', style: AppTextStyles.heading2),
+                  Text('Forgot Password', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'Enter your email and we\'ll send you a 6-digit reset code.',
-                    style: AppTextStyles.body,
+                    style: TextStyle(fontSize: 14, color: context.textSecondary),
                   ),
                   const SizedBox(height: 36),
                   AppTextField(
@@ -124,7 +124,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(fontSize: 13, color: Colors.red),
+                            style: TextStyle(fontSize: 13, color: Colors.red),
                           ),
                         ),
                       ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_background.dart';
 
 const _green = Color(0xFF27AE60);
 const _greenLight = Color(0xFF2ECC71);
@@ -33,8 +34,7 @@ class Co2AssessmentResultsScreen extends StatelessWidget {
     };
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+      body: AppBackground(
         child: SafeArea(
           child: Column(
             children: [
