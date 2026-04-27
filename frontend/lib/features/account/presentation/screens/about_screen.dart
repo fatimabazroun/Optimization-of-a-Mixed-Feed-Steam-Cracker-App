@@ -395,7 +395,7 @@ class _BubbleBanner extends StatelessWidget {
                   const Text('Industrial Cracking Process Facility',
                       style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
-                  Text('CrackerIQ · KFUPM',
+                  Text('CrackX · KFUPM',
                       style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.65))),
                 ],
               ),

@@ -273,20 +273,16 @@ def compute_plume_radius_m(inputs, q_per_well_vol_m3_hr):
     return round(_plume_radius_at_t(duration_hr, inputs, q_per_well_vol_m3_hr), 2)
 
 
-def generate_time_series(inputs, q_per_well_vol, max_safe_years, n_points=60):
-    project_duration = inputs["project_duration"]
-
-    if 0 < max_safe_years < 100:
-        max_t_yr = min(max_safe_years * 1.5, 100.0)
-    else:
-        max_t_yr = project_duration * 1.5
-
+def generate_time_series(inputs, q_per_well_vol):
+    max_t_yr = max(120.0, inputs["project_duration"])
+    months = int(round(max_t_yr * 12))
+    log_start_hr = inputs.get("log_start_time", 1.0) * 24.0
     pressure_series = []
     plume_series    = []
 
-    for i in range(1, n_points + 1):
-        t_yr = i * max_t_yr / n_points
-        t_hr = t_yr * 365 * 24
+    for i in range(months + 1):
+        t_yr = i / 12.0
+        t_hr = max(t_yr * 365 * 24, log_start_hr)
         pressure_series.append([round(t_yr, 3), round(pressure_at_time_mpa(t_hr, inputs, q_per_well_vol), 4)])
         plume_series.append([round(t_yr, 3), round(_plume_radius_at_t(t_hr, inputs, q_per_well_vol), 2)])
 
@@ -325,7 +321,7 @@ def run_reservoir_model(inputs, q_total_kg_hr):
         "Infeasible":  "Reservoir cannot safely sustain the required CO₂ rate under the selected design conditions.",
     }
 
-    pressure_series, plume_series = generate_time_series(inputs, q_per_well_vol, max_safe_years)
+    pressure_series, plume_series = generate_time_series(inputs, q_per_well_vol)
 
     return {
         "status":                        status,

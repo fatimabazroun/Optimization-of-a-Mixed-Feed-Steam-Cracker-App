@@ -95,9 +95,11 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     final perf = data['performance'] as Map<String, dynamic>;
 
     final ethyleneYield = (r['ethylene_yield_percent'] as num? ?? 0).toDouble();
-    final furnaceReduction = (r['furnace_reduction_percent'] as num? ?? 0).toDouble();
+    final furnaceReduction =
+        (r['furnace_reduction_percent'] as num? ?? 0).toDouble();
     final costSaving = (r['cost_saving_percent'] as num? ?? 0).toDouble();
-    final hydrogenPurity = (r['hydrogen_purity_percent'] as num? ?? 0).toDouble();
+    final hydrogenPurity =
+        (r['hydrogen_purity_percent'] as num? ?? 0).toDouble();
     final co2Rate = (r['co2_rate'] as num? ?? 0).toDouble();
 
     // Reservoir results (only present when use_reservoir=true)
@@ -135,19 +137,20 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
       'feasibilityMessage': res?['feasibility_message'] as String? ?? '',
       'maxInjectionTime':
           (res?['max_safe_injection_time_years'] as num? ?? 0).toDouble(),
-      'pressureAtEnd':
-          (res?['final_pressure_mpa'] as num? ?? 0).toDouble(),
+      'pressureAtEnd': (res?['final_pressure_mpa'] as num? ?? 0).toDouble(),
       'maxSustainableRate':
           (res?['max_sustainable_rate_kg_hr'] as num? ?? 0).toDouble(),
-      'plumeRadius':
-          (res?['estimated_plume_radius_m'] as num? ?? 0).toDouble(),
+      'plumeRadius': (res?['estimated_plume_radius_m'] as num? ?? 0).toDouble(),
       'allowablePressure':
           (res?['allowable_pressure_mpa'] as num? ?? 0).toDouble(),
+      'reservoirRadius': (res?['reservoir_radius_m'] as num? ?? 0).toDouble(),
       'pressureSeries': (res?['pressure_series'] as List<dynamic>? ?? [])
-          .map((p) => FlSpot((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+          .map(
+              (p) => FlSpot((p[0] as num).toDouble(), (p[1] as num).toDouble()))
           .toList(),
       'plumeSeries': (res?['plume_series'] as List<dynamic>? ?? [])
-          .map((p) => FlSpot((p[0] as num).toDouble(), (p[1] as num).toDouble()))
+          .map(
+              (p) => FlSpot((p[0] as num).toDouble(), (p[1] as num).toDouble()))
           .toList(),
       'iseRecommendation': ise?['recommendation'] as String? ?? '',
       'ethyleneKgHr': (iseKpis?['ethylene_kg_hr'] as num? ?? 0).toDouble(),
@@ -186,7 +189,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                             size: 16, color: context.textSecondary),
                         SizedBox(width: 4),
                         Text('Back to Configuration',
-                            style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                            style: TextStyle(
+                                fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
@@ -199,7 +203,11 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Simulation Results',
-                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
+                            style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: context.textPrimary,
+                                height: 1.2)),
                         SizedBox(height: 20),
 
                         // Tabs
@@ -270,8 +278,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                                       icon: Icons.bookmark_outline,
                                       label: 'Save',
                                       accentColor: accentColor,
-                                      onTap: () =>
-                                          _showSaveDialog(context, accentColor))),
+                                      onTap: () => _showSaveDialog(
+                                          context, accentColor))),
                               SizedBox(width: 12),
                             ],
                             Expanded(
@@ -339,8 +347,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           SizedBox(height: 8),
           Text(_error ?? 'Unknown error',
               textAlign: TextAlign.center,
-              style:
-                  TextStyle(fontSize: 12, color: context.textSecondary)),
+              style: TextStyle(fontSize: 12, color: context.textSecondary)),
           SizedBox(height: 16),
           GestureDetector(
             onTap: () {
@@ -351,8 +358,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               _loadResults();
             },
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                   color: accentColor, borderRadius: BorderRadius.circular(10)),
               child: Text('Retry',
@@ -502,7 +508,6 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           ),
           SizedBox(height: 20),
         ],
-
       ],
     );
   }
@@ -531,8 +536,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: feasColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
@@ -560,9 +564,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
             SizedBox(height: 8),
             Text(feasMsg,
                 style: TextStyle(
-                    fontSize: 12,
-                    color: context.textSecondary,
-                    height: 1.5)),
+                    fontSize: 12, color: context.textSecondary, height: 1.5)),
           ],
         ],
       ),
@@ -708,8 +710,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(unit,
-                    style: TextStyle(
-                        fontSize: 12, color: context.textSecondary)),
+                    style:
+                        TextStyle(fontSize: 12, color: context.textSecondary)),
               ),
             ],
           ),
@@ -725,44 +727,66 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
   Widget _buildPerformance(Color accentColor) {
     final r = _results;
     final pressureSpots = (r?['pressureSeries'] as List<FlSpot>?) ?? [];
-    final plumeSpots    = (r?['plumeSeries']    as List<FlSpot>?) ?? [];
-    final pAllow          = (r?['allowablePressure'] as double?) ?? 0.0;
-    final reservoirRadius = (widget.reservoirInputs?['radius'] as num? ?? 0).toDouble();
+    final plumeSpots = (r?['plumeSeries'] as List<FlSpot>?) ?? [];
+    final pAllow = (r?['allowablePressure'] as double?) ?? 0.0;
+    final reservoirRadius =
+        ((widget.reservoirInputs?['radius'] as num?)?.toDouble() ??
+            (r?['reservoirRadius'] as double?) ??
+            0.0);
 
-    final projectDuration =
-        (widget.reservoirInputs?['project_duration'] as num?)?.toDouble() ?? 100.0;
-    // Compute effectiveXMax here so all spots use the same final bound
-    final xRaw       = projectDuration * 1.1;
-    final xInterval  = _niceInterval(0, xRaw, 7);
-    final xMax       = _niceMax(xRaw, xInterval);
+    final seriesXMax = [
+      ...pressureSpots.map((s) => s.x),
+      ...plumeSpots.map((s) => s.x),
+    ].fold<double>(0.0, math.max);
+    final requestedDuration =
+        (widget.reservoirInputs?['project_duration'] as num?)?.toDouble() ??
+            0.0;
+    final chartDuration =
+        requestedDuration > 0 ? requestedDuration : seriesXMax;
+    final xInterval = _niceInterval(0, chartDuration, 7);
+    final xMax = _niceMax(chartDuration, xInterval);
+    final visiblePressureSpots = _spotsThroughX(pressureSpots, xMax);
+    final visiblePlumeSpots = _spotsThroughX(plumeSpots, xMax);
 
-    // Pressure Y
-    final actualPressMin = pressureSpots.isNotEmpty
-        ? pressureSpots.map((s) => s.y).reduce(math.min)
+    // Pressure Y — scale to data + allowable pressure
+    final actualPressMin = visiblePressureSpots.isNotEmpty
+        ? visiblePressureSpots.map((s) => s.y).reduce(math.min)
         : pAllow;
-    final actualPressMax = pressureSpots.isNotEmpty
-        ? pressureSpots.map((s) => s.y).reduce(math.max)
+    final actualPressMax = visiblePressureSpots.isNotEmpty
+        ? visiblePressureSpots.map((s) => s.y).reduce(math.max)
         : pAllow;
     final pressYMin = math.min(actualPressMin, pAllow) - 1.0;
     final pressYMax = math.max(actualPressMax, pAllow) + 1.0;
 
-    // Plume Y
-    final actualPlumeMax = plumeSpots.isNotEmpty
-        ? plumeSpots.map((s) => s.y).reduce(math.max)
+    // Plume Y — match report: show both plume and reservoir radius on same scale
+    final actualPlumeMax = visiblePlumeSpots.isNotEmpty
+        ? visiblePlumeSpots.map((s) => s.y).reduce(math.max)
         : 0.0;
-    final plumeYMax = math.max(reservoirRadius + 1000, actualPlumeMax + 200);
+    final plumeYMax =
+        math.max(reservoirRadius * 1.2, actualPlumeMax * 1.2 + 200);
 
-    // Reference lines span exactly 0 → xMax (same as chart bounds)
+    // Reference lines span full 0 → xMax
     final pAllowSpots = [FlSpot(0, pAllow), FlSpot(xMax, pAllow)];
-    final resRadSpots = [FlSpot(0, reservoirRadius), FlSpot(xMax, reservoirRadius)];
+    final resRadSpots = [
+      FlSpot(0, reservoirRadius),
+      FlSpot(xMax, reservoirRadius)
+    ];
 
     return Column(
       children: [
         _reservoirLineChart(
           title: 'Pressure vs Time',
           series: [
-            _ChartSeries(spots: pressureSpots, label: 'Pressure (MPa)',    color: AppColors.primaryBlue,   dashed: false),
-            _ChartSeries(spots: pAllowSpots,   label: 'Allowable P (MPa)', color: const Color(0xFFE74C3C), dashed: true),
+            _ChartSeries(
+                spots: visiblePressureSpots,
+                label: 'Pressure (MPa)',
+                color: AppColors.primaryBlue,
+                dashed: false),
+            _ChartSeries(
+                spots: pAllowSpots,
+                label: 'Allowable P (MPa)',
+                color: const Color(0xFFE74C3C),
+                dashed: true),
           ],
           xMax: xMax,
           xInterval: xInterval,
@@ -771,12 +795,20 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           xLabel: 'Time (years)',
           yLabel: 'Pressure (MPa)',
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _reservoirLineChart(
           title: 'Plume Radius vs Time',
           series: [
-            _ChartSeries(spots: plumeSpots,  label: 'Plume radius (m)',    color: AppColors.cyan,          dashed: false),
-            _ChartSeries(spots: resRadSpots, label: 'Reservoir radius (m)', color: const Color(0xFFE74C3C), dashed: true),
+            _ChartSeries(
+                spots: visiblePlumeSpots,
+                label: 'Plume radius (m)',
+                color: AppColors.cyan,
+                dashed: false),
+            _ChartSeries(
+                spots: resRadSpots,
+                label: 'Reservoir radius (m)',
+                color: const Color(0xFFE74C3C),
+                dashed: true),
           ],
           xMax: xMax,
           xInterval: xInterval,
@@ -801,8 +833,25 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     if (norm <= 7.0) return 5 * mag;
     return 10 * mag;
   }
+
   static double _niceMin(double v, double i) => (v / i).floor() * i;
-  static double _niceMax(double v, double i) => (v / i).ceil()  * i;
+  static double _niceMax(double v, double i) => (v / i).ceil() * i;
+
+  static List<FlSpot> _spotsThroughX(List<FlSpot> spots, double maxX) {
+    if (spots.isEmpty) return spots;
+    final visible = spots.where((s) => s.x <= maxX).toList();
+    if (visible.isEmpty || visible.last.x == maxX || spots.last.x < maxX) {
+      return visible;
+    }
+
+    final next = spots.firstWhere((s) => s.x > maxX);
+    final prev = visible.last;
+    final dx = next.x - prev.x;
+    if (dx <= 0) return visible;
+
+    final t = (maxX - prev.x) / dx;
+    return [...visible, FlSpot(maxX, prev.y + (next.y - prev.y) * t)];
+  }
 
   Widget _reservoirLineChart({
     required String title,
@@ -818,10 +867,10 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     final safeYMin = yMin.isFinite ? yMin : 0.0;
     final safeYMax = (yMax.isFinite && yMax > safeYMin) ? yMax : safeYMin + 1.0;
 
-    final yInterval      = _niceInterval(safeYMin, safeYMax, 7);
-    final effectiveYMin  = _niceMin(safeYMin, yInterval);
-    final effectiveYMax  = _niceMax(safeYMax, yInterval);
-    final effectiveXMax  = xMax;
+    final yInterval = _niceInterval(safeYMin, safeYMax, 7);
+    final effectiveYMin = _niceMin(safeYMin, yInterval);
+    final effectiveYMax = _niceMax(safeYMax, yInterval);
+    final effectiveXMax = xMax;
 
     String yFmt(double v) =>
         yInterval >= 100 ? v.toStringAsFixed(1) : v.toStringAsFixed(2);
@@ -843,7 +892,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
         children: [
           Text(title,
               style: TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                   color: context.textPrimary)),
           SizedBox(height: 20),
           RepaintBoundary(
@@ -851,110 +901,124 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               height: 320,
               child: LineChart(
                 LineChartData(
-                clipData: const FlClipData.all(),
-                minX: 0,
-                maxX: effectiveXMax,
-                minY: effectiveYMin,
-                maxY: effectiveYMax,
-                lineBarsData: series.map((s) => LineChartBarData(
-                  spots: s.spots.isEmpty
-                      ? [FlSpot(0, safeYMin), FlSpot(effectiveXMax, safeYMin)]
-                      : s.spots,
-                  isCurved: !s.dashed,
-                  color: s.spots.isEmpty
-                      ? s.color.withValues(alpha: 0)
-                      : s.color,
-                  barWidth: s.dashed ? 2.5 : 4.0,
-                  dotData: const FlDotData(show: false),
-                  dashArray: s.dashed ? [6, 4] : null,
-                  belowBarData: BarAreaData(show: false),
-                )).toList(),
-                titlesData: FlTitlesData(
-                  topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    axisNameWidget: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(xLabel,
-                          style: TextStyle(fontSize: 12,
-                              color: context.textSecondary,
-                              fontWeight: FontWeight.w600)),
+                  clipData: const FlClipData.all(),
+                  minX: 0,
+                  maxX: effectiveXMax,
+                  minY: effectiveYMin,
+                  maxY: effectiveYMax,
+                  lineBarsData: series
+                      .map((s) => LineChartBarData(
+                            spots: s.spots.isEmpty
+                                ? [
+                                    FlSpot(0, safeYMin),
+                                    FlSpot(effectiveXMax, safeYMin)
+                                  ]
+                                : s.spots,
+                            isCurved: !s.dashed,
+                            color: s.spots.isEmpty
+                                ? s.color.withValues(alpha: 0)
+                                : s.color,
+                            barWidth: s.dashed ? 2.5 : 4.0,
+                            dotData: const FlDotData(show: false),
+                            dashArray: s.dashed ? [6, 4] : null,
+                            belowBarData: BarAreaData(show: false),
+                          ))
+                      .toList(),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      axisNameWidget: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(xLabel,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      axisNameSize: 28,
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 64,
+                        interval: xInterval,
+                        getTitlesWidget: (v, meta) {
+                          final label = xInterval >= 1
+                              ? v.toStringAsFixed(0)
+                              : xInterval >= 0.1
+                                  ? v.toStringAsFixed(1)
+                                  : v.toStringAsFixed(2);
+                          return SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            child: Text(label,
+                                style: TextStyle(
+                                    fontSize: 10, color: context.textTertiary)),
+                          );
+                        },
+                      ),
                     ),
-                    axisNameSize: 28,
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 64,
-                      interval: xInterval,
-                      getTitlesWidget: (v, meta) {
-                        final label = xInterval >= 1
-                            ? v.toStringAsFixed(0)
-                            : xInterval >= 0.1
-                                ? v.toStringAsFixed(1)
-                                : v.toStringAsFixed(2);
-                        return SideTitleWidget(
-                          axisSide: meta.axisSide,
-                          child: Text(label,
-                              style: TextStyle(
-                                  fontSize: 10, color: context.textTertiary)),
+                    leftTitles: AxisTitles(
+                      axisNameWidget: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(yLabel,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      axisNameSize: 28,
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 62,
+                        interval: yInterval,
+                        getTitlesWidget: (v, _) => Text(yFmt(v),
+                            style: TextStyle(
+                                fontSize: 10, color: context.textTertiary),
+                            textAlign: TextAlign.right),
+                      ),
+                    ),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    horizontalInterval: yInterval,
+                    verticalInterval: xInterval,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                        color: context.textTertiary.withValues(alpha: 0.18),
+                        strokeWidth: 1.0),
+                    getDrawingVerticalLine: (_) => FlLine(
+                        color: context.textTertiary.withValues(alpha: 0.18),
+                        strokeWidth: 1.0),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border.all(
+                        color: context.textTertiary.withValues(alpha: 0.30),
+                        width: 1.0),
+                  ),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) =>
+                          AppColors.darkBase.withValues(alpha: 0.85),
+                      getTooltipItems: (touched) => touched.map((s) {
+                        final label = series[s.barIndex].label;
+                        return LineTooltipItem(
+                          '${s.y.toStringAsFixed(2)}\n',
+                          TextStyle(
+                              fontSize: 11,
+                              color: context.surface,
+                              fontWeight: FontWeight.w600),
+                          children: [
+                            TextSpan(
+                                text: label,
+                                style: TextStyle(
+                                    fontSize: 9, color: Colors.white70))
+                          ],
                         );
-                      },
+                      }).toList(),
                     ),
                   ),
-                  leftTitles: AxisTitles(
-                    axisNameWidget: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(yLabel,
-                          style: TextStyle(fontSize: 12,
-                              color: context.textSecondary,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                    axisNameSize: 28,
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 62,
-                      interval: yInterval,
-                      getTitlesWidget: (v, _) => Text(yFmt(v),
-                          style: TextStyle(
-                              fontSize: 10, color: context.textTertiary),
-                          textAlign: TextAlign.right),
-                    ),
-                  ),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  horizontalInterval: yInterval,
-                  verticalInterval: xInterval,
-                  getDrawingHorizontalLine: (_) => FlLine(
-                      color: context.textTertiary.withValues(alpha: 0.18),
-                      strokeWidth: 1.0),
-                  getDrawingVerticalLine: (_) => FlLine(
-                      color: context.textTertiary.withValues(alpha: 0.18),
-                      strokeWidth: 1.0),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border.all(
-                      color: context.textTertiary.withValues(alpha: 0.30),
-                      width: 1.0),
-                ),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (_) =>
-                        AppColors.darkBase.withValues(alpha: 0.85),
-                    getTooltipItems: (touched) => touched.map((s) {
-                      final label = series[s.barIndex].label;
-                      return LineTooltipItem(
-                        '${s.y.toStringAsFixed(2)}\n',
-                        TextStyle(fontSize: 11, color: context.surface,
-                            fontWeight: FontWeight.w600),
-                        children: [TextSpan(text: label,
-                            style: TextStyle(fontSize: 9,
-                                color: Colors.white70))],
-                      );
-                    }).toList(),
-                  ),
-                ),
                 ),
                 duration: Duration.zero,
               ),
@@ -962,17 +1026,23 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
           ),
           SizedBox(height: 14),
           Wrap(
-            spacing: 18, runSpacing: 6,
-            children: series.map((s) => Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomPaint(size: const Size(22, 10),
-                    painter: _LineLegendPainter(color: s.color, dashed: s.dashed)),
-                SizedBox(width: 6),
-                Text(s.label,
-                    style: TextStyle(fontSize: 10, color: context.textTertiary)),
-              ],
-            )).toList(),
+            spacing: 18,
+            runSpacing: 6,
+            children: series
+                .map((s) => Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CustomPaint(
+                            size: const Size(22, 10),
+                            painter: _LineLegendPainter(
+                                color: s.color, dashed: s.dashed)),
+                        SizedBox(width: 6),
+                        Text(s.label,
+                            style: TextStyle(
+                                fontSize: 10, color: context.textTertiary)),
+                      ],
+                    ))
+                .toList(),
           ),
         ],
       ),
@@ -1005,7 +1075,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                     color: accentColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.lightbulb_outline, color: accentColor, size: 18),
+                  child: Icon(Icons.lightbulb_outline,
+                      color: accentColor, size: 18),
                 ),
                 SizedBox(width: 12),
                 Expanded(
@@ -1039,14 +1110,19 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
             ),
             child: Column(
               children: [
-                Icon(Icons.lightbulb_outline, size: 40, color: AppColors.highlight),
+                Icon(Icons.lightbulb_outline,
+                    size: 40, color: AppColors.highlight),
                 SizedBox(height: 12),
                 Text('No recommendation available',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.textSecondary)),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: context.textSecondary)),
                 SizedBox(height: 6),
                 Text('Run a simulation to receive optimization guidance.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: context.textTertiary)),
+                    style:
+                        TextStyle(fontSize: 12, color: context.textTertiary)),
               ],
             ),
           ),
@@ -1141,7 +1217,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                 SizedBox(height: 2),
                 Text(description,
                     style: TextStyle(
-                        fontSize: 10, color: context.textTertiary, height: 1.4)),
+                        fontSize: 10,
+                        color: context.textTertiary,
+                        height: 1.4)),
               ],
             ),
           ),
@@ -1153,8 +1231,7 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   style: TextStyle(
                       fontSize: 22, fontWeight: FontWeight.w800, color: color)),
               Text(unit,
-                  style: TextStyle(
-                      fontSize: 11, color: context.textSecondary)),
+                  style: TextStyle(fontSize: 11, color: context.textSecondary)),
             ],
           ),
         ],
@@ -1180,7 +1257,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
             decoration: BoxDecoration(
               color: context.surface.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: accentColor.withValues(alpha: 0.18), width: 1.2),
+              border: Border.all(
+                  color: accentColor.withValues(alpha: 0.18), width: 1.2),
               boxShadow: [
                 BoxShadow(
                   color: accentColor.withValues(alpha: 0.18),
@@ -1228,8 +1306,9 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
     try {
       final now = DateTime.now();
-      final ts  = '${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}'
-                  '_${now.hour.toString().padLeft(2,'0')}${now.minute.toString().padLeft(2,'0')}${now.second.toString().padLeft(2,'0')}';
+      final ts =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
+          '_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
 
       final url = await ReportService.generateReport(
         scenario: widget.scenario['title'] as String,
@@ -1289,8 +1368,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       color: Colors.red.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.error_outline,
-                        color: Colors.red, size: 28),
+                    child:
+                        Icon(Icons.error_outline, color: Colors.red, size: 28),
                   ),
                   SizedBox(height: 20),
                   Text('Report Failed',
@@ -1301,7 +1380,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   SizedBox(height: 8),
                   Text('Could not generate the PDF report.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: context.textSecondary)),
+                      style: TextStyle(
+                          fontSize: 13, color: context.textSecondary)),
                   SizedBox(height: 8),
                   Text(e.toString(),
                       textAlign: TextAlign.center,
@@ -1453,7 +1533,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     // ── Name dialog ───────────────────────────────────────────────────────────
     final now = DateTime.now();
     final nameController = TextEditingController(
-      text: '${widget.scenario['title']} – ${now.day} ${_monthName(now.month)} ${now.year}, '
+      text:
+          '${widget.scenario['title']} – ${now.day} ${_monthName(now.month)} ${now.year}, '
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
     );
 
@@ -1511,14 +1592,13 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text('Scenario Name',
-                      style: TextStyle(
-                          fontSize: 12, color: context.textTertiary)),
+                      style:
+                          TextStyle(fontSize: 12, color: context.textTertiary)),
                 ),
                 SizedBox(height: 8),
                 TextField(
                   controller: nameController,
-                  style:
-                      TextStyle(fontSize: 14, color: context.textPrimary),
+                  style: TextStyle(fontSize: 14, color: context.textPrimary),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: context.inputBg,
@@ -1594,10 +1674,14 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
     }
     final perf = _results!['performance'] as Map<String, dynamic>;
     final statuses = perf.values
-        .map((v) => ((v as Map<String, dynamic>)['status'] as String? ?? '').toLowerCase())
+        .map((v) => ((v as Map<String, dynamic>)['status'] as String? ?? '')
+            .toLowerCase())
         .toList();
-    if (statuses.any((s) => s.contains('critical') || s.contains('infeasible'))) return 'Critical';
-    if (statuses.any((s) => s.contains('moderate') || s.contains('warning') || s.contains('needs'))) return 'Warning';
+    if (statuses.any((s) => s.contains('critical') || s.contains('infeasible')))
+      return 'Critical';
+    if (statuses.any((s) =>
+        s.contains('moderate') || s.contains('warning') || s.contains('needs')))
+      return 'Warning';
     return 'Optimal';
   }
 
@@ -1672,16 +1756,16 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
 
       await ScenarioService.addScenario(
         {
-          'name':          name,
-          'date':          date,
-          'simId':         simId,
-          'status':        _deriveStatus(),
-          'temperature':   widget.temperature,
-          'pressure':      widget.pressure,
-          'scenario':      widget.scenario['title'],
-          'scenarioType':  widget.scenarioId,
+          'name': name,
+          'date': date,
+          'simId': simId,
+          'status': _deriveStatus(),
+          'temperature': widget.temperature,
+          'pressure': widget.pressure,
+          'scenario': widget.scenario['title'],
+          'scenarioType': widget.scenarioId,
           'selectedValue': widget.selectedValue,
-          'useReservoir':  widget.useReservoir,
+          'useReservoir': widget.useReservoir,
         },
         _rawApiData ?? {},
       );
@@ -1810,7 +1894,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
               decoration: BoxDecoration(
                 color: context.surfaceModal,
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.20), width: 1.2),
+                border: Border.all(
+                    color: Colors.red.withValues(alpha: 0.20), width: 1.2),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.red.withValues(alpha: 0.12),
@@ -1830,7 +1915,8 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                       color: Colors.red.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.error_outline, color: Colors.red, size: 28),
+                    child:
+                        Icon(Icons.error_outline, color: Colors.red, size: 28),
                   ),
                   SizedBox(height: 20),
                   Text('Save Failed',
@@ -1841,12 +1927,15 @@ class _SimulationResultsScreenState extends State<SimulationResultsScreen>
                   SizedBox(height: 8),
                   Text('Could not save the scenario.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: context.textSecondary)),
+                      style: TextStyle(
+                          fontSize: 13, color: context.textSecondary)),
                   SizedBox(height: 8),
                   Text(e.toString(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 11, color: context.textTertiary, height: 1.4)),
+                          fontSize: 11,
+                          color: context.textTertiary,
+                          height: 1.4)),
                   SizedBox(height: 24),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
@@ -2016,16 +2105,18 @@ class _LineLegendPainter extends CustomPainter {
       bool draw = true;
       while (x < size.width) {
         final end = math.min(x + 5, size.width);
-        if (draw) canvas.drawLine(Offset(x, size.height / 2), Offset(end, size.height / 2), paint);
+        if (draw)
+          canvas.drawLine(
+              Offset(x, size.height / 2), Offset(end, size.height / 2), paint);
         x += draw ? 5 : 3;
         draw = !draw;
       }
     } else {
-      canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), paint);
+      canvas.drawLine(Offset(0, size.height / 2),
+          Offset(size.width, size.height / 2), paint);
     }
   }
 
   @override
   bool shouldRepaint(_LineLegendPainter old) => false;
 }
-

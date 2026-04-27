@@ -102,7 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 32),
                   Text('Create Account', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   const SizedBox(height: 6),
-                  Text('Begin your journey to CrackerIQ', style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                  Text('Begin your journey to CrackX', style: TextStyle(fontSize: 14, color: context.textSecondary)),
                   const SizedBox(height: 32),
 
                   AppTextField(

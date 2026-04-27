@@ -49,7 +49,7 @@ class AppColors {
 }
 
 // ── BuildContext color extension ────────────────────────────────────────────
-extension CrackerIQTheme on BuildContext {
+extension CrackXTheme on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 
   // Surfaces

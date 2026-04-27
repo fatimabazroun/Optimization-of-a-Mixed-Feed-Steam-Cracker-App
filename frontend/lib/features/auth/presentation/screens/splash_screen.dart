@@ -151,7 +151,7 @@ class _SplashScreenState extends State<SplashScreen>
                     position: _textSlide,
                     child: Builder(builder: (context) => Column(
                       children: [
-                        Text('Welcome\nto CrackerIQ', textAlign: TextAlign.center,
+                        Text('Welcome\nto CrackX', textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.textPrimary, height: 1.2)),
                         const SizedBox(height: 12),
                         Text('Your journey begins here — optimize smarter, where engineering meets intelligence.',

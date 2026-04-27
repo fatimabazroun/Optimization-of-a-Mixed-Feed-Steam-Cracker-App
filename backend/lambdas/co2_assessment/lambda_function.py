@@ -124,6 +124,14 @@ def compute_max_sustainable_rate_kg_hr(inputs, q_total_kg_hr, p_allow_mpa):
     return round(best, 2)
 
 
+def _plume_radius_at_t(t_hr, inputs, q_per_well_vol_m3_hr):
+    phi   = max(inputs["porosity"], 1e-9)
+    h_m   = max(inputs["thickness"], 1e-9)
+    s_co2 = max(inputs.get("co2_saturation", 0.2), 1e-9)
+    vol_per_well = q_per_well_vol_m3_hr * t_hr
+    return round(math.sqrt(vol_per_well / (math.pi * phi * h_m * s_co2)), 2)
+
+
 def compute_plume_radius_m(inputs, q_per_well_vol_m3_hr):
     """
     Volumetric plume-radius estimate per well (PDF §12.3).
@@ -131,11 +139,23 @@ def compute_plume_radius_m(inputs, q_per_well_vol_m3_hr):
     r_p = sqrt(q_well · T_proj / (π · φ · h · S_CO2))
     """
     duration_hr = inputs["project_duration"] * 365 * 24
-    phi   = max(inputs["porosity"], 1e-9)
-    h_m   = max(inputs["thickness"], 1e-9)
-    s_co2 = max(inputs.get("co2_saturation", 0.2), 1e-9)
-    vol_per_well = q_per_well_vol_m3_hr * duration_hr
-    return round(math.sqrt(vol_per_well / (math.pi * phi * h_m * s_co2)), 2)
+    return _plume_radius_at_t(duration_hr, inputs, q_per_well_vol_m3_hr)
+
+
+def generate_time_series(inputs, q_per_well_vol_m3_hr):
+    project_duration = inputs["project_duration"]
+    months = int(round(project_duration * 12))
+    log_start_hr = inputs.get("log_start_time", 1.0) * 24.0
+    pressure_series = []
+    plume_series = []
+
+    for i in range(months + 1):
+        t_yr = i / 12.0
+        t_hr = max(t_yr * 365 * 24, log_start_hr)
+        pressure_series.append([round(t_yr, 3), round(pressure_at_time_mpa(t_hr, inputs, q_per_well_vol_m3_hr), 4)])
+        plume_series.append([round(t_yr, 3), _plume_radius_at_t(t_hr, inputs, q_per_well_vol_m3_hr)])
+
+    return pressure_series, plume_series
 
 
 def classify_reservoir_screening(inputs, max_safe_years, plume_radius_m):
@@ -163,6 +183,7 @@ def run_co2_assessment(reservoir_inputs, co2_rate_kg_hr):
     final_pressure = pressure_at_time_mpa(t_final_hr, reservoir_inputs, q_per_well_vol)
 
     status = classify_reservoir_screening(reservoir_inputs, max_safe_years, plume_radius_m)
+    pressure_series, plume_series = generate_time_series(reservoir_inputs, q_per_well_vol)
 
     messages = {
         "Feasible":     "Reservoir can sustain the required CO₂ rate for the full project duration without exceeding pressure limits.",
@@ -177,6 +198,10 @@ def run_co2_assessment(reservoir_inputs, co2_rate_kg_hr):
         "final_pressure_mpa":            round(final_pressure, 4),
         "max_sustainable_rate_kg_hr":    round(max_rate_kg_hr, 2),
         "estimated_plume_radius_m":      round(plume_radius_m, 2),
+        "allowable_pressure_mpa":        round(p_allow_mpa, 4),
+        "reservoir_radius_m":            reservoir_inputs["radius"],
+        "pressure_series":               pressure_series,
+        "plume_series":                  plume_series,
     }
 
 

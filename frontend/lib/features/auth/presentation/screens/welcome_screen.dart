@@ -77,7 +77,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  Text('Welcome to CrackerIQ',
+                  Text('Welcome to CrackX',
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.cyan),
                       textAlign: TextAlign.center),
                   const SizedBox(height: 16),

@@ -14,7 +14,7 @@ void main() async {
   await dotenv.load(fileName: '.env');
   await themeProvider.init();
   await _configureAmplify();
-  runApp(const CrackerIQApp());
+  runApp(const CrackXApp());
 }
 
 Future<void> _configureAmplify() async {
@@ -26,15 +26,15 @@ Future<void> _configureAmplify() async {
   }
 }
 
-class CrackerIQApp extends StatelessWidget {
-  const CrackerIQApp({super.key});
+class CrackXApp extends StatelessWidget {
+  const CrackXApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: themeProvider,
       builder: (_, __) => MaterialApp(
-        title: 'CrackerIQ',
+        title: 'CrackX',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
