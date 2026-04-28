@@ -5,6 +5,7 @@ import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/glass_toast.dart';
 import '../../../workspace/presentation/screens/main_shell.dart';
 import 'register_screen.dart';
 import 'verification_screen.dart';
@@ -71,13 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService.friendlyError(e)),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      showGlassToast(
+        context,
+        AuthService.friendlyError(e),
+        type: GlassToastType.error,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -103,44 +101,54 @@ class _LoginScreenState extends State<LoginScreen> {
                     onTap: () => Navigator.pop(context),
                     child: Row(
                       children: [
-                        Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
+                        Icon(Icons.arrow_back_ios,
+                            size: 16, color: context.textSecondary),
                         const SizedBox(width: 4),
-                        Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                        Text('Back',
+                            style: TextStyle(
+                                fontSize: 14, color: context.textSecondary)),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 32),
-                  Text('Welcome Back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                  Text('Welcome Back',
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary)),
                   const SizedBox(height: 6),
-                  Text('Log in to continue your journey', style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                  Text('Log in to continue your journey',
+                      style: TextStyle(
+                          fontSize: 14, color: context.textSecondary)),
                   const SizedBox(height: 36),
-
                   AppTextField(
                     hint: 'Email address',
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email is required';
-                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v.trim())) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Email is required';
+                      }
+                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(v.trim())) {
                         return 'Enter a valid email address';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 14),
-
                   AppTextField(
                     hint: 'Password',
                     isPassword: true,
                     controller: _passwordController,
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Password is required';
-                      if (v.length < 8) return 'Password must be at least 8 characters';
+                      if (v.length < 8) {
+                        return 'Password must be at least 8 characters';
+                      }
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
@@ -148,39 +156,43 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: () => Navigator.push(
                         context,
                         PageRouteBuilder(
-                          pageBuilder: (_, __, ___) => const ForgotPasswordScreen(),
+                          pageBuilder: (_, __, ___) =>
+                              const ForgotPasswordScreen(),
                           transitionsBuilder: (_, anim, __, child) =>
                               FadeTransition(opacity: anim, child: child),
                           transitionDuration: const Duration(milliseconds: 300),
                         ),
                       ),
-                      child: const Text('Forgot Password?', style: AppTextStyles.link),
+                      child: const Text('Forgot Password?',
+                          style: AppTextStyles.link),
                     ),
                   ),
-
                   const SizedBox(height: 32),
                   GradientButton(
                     text: _loading ? 'Signing in…' : 'Log In',
                     onPressed: _loading ? null : _onLogin,
                   ),
                   const SizedBox(height: 24),
-
                   Row(
                     children: [
                       Expanded(child: Divider(color: context.inputBorder)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('or', style: TextStyle(color: context.textTertiary, fontSize: 13)),
+                        child: Text('or',
+                            style: TextStyle(
+                                color: context.textTertiary, fontSize: 13)),
                       ),
                       Expanded(child: Divider(color: context.inputBorder)),
                     ],
                   ),
-
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Flexible(child: Text("Don't have an account? ", style: TextStyle(fontSize: 14, color: context.textSecondary))),
+                      Flexible(
+                          child: Text("Don't have an account? ",
+                              style: TextStyle(
+                                  fontSize: 14, color: context.textSecondary))),
                       GestureDetector(
                         onTap: () => Navigator.pushReplacement(
                           context,
@@ -188,7 +200,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             pageBuilder: (_, __, ___) => const RegisterScreen(),
                             transitionsBuilder: (_, anim, __, child) =>
                                 FadeTransition(opacity: anim, child: child),
-                            transitionDuration: const Duration(milliseconds: 300),
+                            transitionDuration:
+                                const Duration(milliseconds: 300),
                           ),
                         ),
                         child: const Text('Sign Up', style: AppTextStyles.link),

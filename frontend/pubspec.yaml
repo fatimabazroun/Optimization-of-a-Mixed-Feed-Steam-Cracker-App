@@ -1,7 +1,7 @@
 name: crackx
 description: CrackX — Mixed-Feed Steam Cracker Decision-Support Application
 publish_to: 'none'
-version: 1.0.0+20260427
+version: 1.0.0+202604233
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

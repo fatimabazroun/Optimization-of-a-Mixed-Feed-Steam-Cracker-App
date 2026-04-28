@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_background.dart';
 import '../../../../core/services/auth_service.dart';
 import '../../../../shared/widgets/gradient_button.dart';
+import '../../../../shared/widgets/glass_toast.dart';
 import 'welcome_screen.dart';
 
 class VerificationScreen extends StatefulWidget {
@@ -40,8 +41,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   @override
   void dispose() {
-    for (final c in _controllers) { c.dispose(); }
-    for (final f in _focusNodes) { f.dispose(); }
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -63,19 +68,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
   Future<void> _onContinue() async {
     if (!_isComplete) {
       setState(() => _hasError = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.warning_amber_outlined, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Expanded(child: Text('Please enter the complete 6-digit code')),
-            ],
-          ),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      showGlassToast(
+        context,
+        'Please enter the complete 6-digit code.',
+        type: GlassToastType.error,
       );
       return;
     }
@@ -108,13 +104,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
       );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService.friendlyError(e)),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      showGlassToast(
+        context,
+        AuthService.friendlyError(e),
+        type: GlassToastType.error,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -124,27 +117,23 @@ class _VerificationScreenState extends State<VerificationScreen> {
   Future<void> _onResend() async {
     try {
       await AuthService.resendSignUpCode(widget.email);
-      for (final c in _controllers) { c.clear(); }
+      for (final c in _controllers) {
+        c.clear();
+      }
       setState(() => _hasError = false);
       _focusNodes[0].requestFocus();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Code resent successfully'),
-          backgroundColor: AppColors.cyan,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      showGlassToast(
+        context,
+        'Code resent successfully.',
+        type: GlassToastType.success,
       );
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService.friendlyError(e)),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      showGlassToast(
+        context,
+        AuthService.friendlyError(e),
+        type: GlassToastType.error,
       );
     }
   }
@@ -168,20 +157,22 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   onTap: () => Navigator.pop(context),
                   child: Row(
                     children: [
-                      Icon(Icons.arrow_back_ios, size: 16, color: context.textSecondary),
+                      Icon(Icons.arrow_back_ios,
+                          size: 16, color: context.textSecondary),
                       SizedBox(width: 4),
-                      Text('Back', style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                      Text('Back',
+                          style: TextStyle(
+                              fontSize: 14, color: context.textSecondary)),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 48),
-
                 Center(
                   child: Column(
                     children: [
                       Container(
-                        width: 72, height: 72,
+                        width: 72,
+                        height: 72,
                         decoration: BoxDecoration(
                           color: AppColors.cyan.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
@@ -193,7 +184,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
                       Text('Enter Verification\nCode',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary)),
                       const SizedBox(height: 12),
                       Text(
                         "We've sent a 6-digit code to\n${widget.email}",
@@ -238,7 +232,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               focusNode: _focusNodes[i],
                               textAlign: TextAlign.center,
                               keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                               maxLength: 1,
                               style: TextStyle(
                                 fontSize: boxSize * 0.42,
@@ -271,12 +267,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       GestureDetector(
                         onTap: _onResend,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
                             border: Border.all(color: context.inputBorder),
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: Text('Resend Code', style: TextStyle(fontSize: 14, color: context.textSecondary)),
+                          child: Text('Resend Code',
+                              style: TextStyle(
+                                  fontSize: 14, color: context.textSecondary)),
                         ),
                       ),
 

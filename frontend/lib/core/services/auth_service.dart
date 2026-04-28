@@ -53,6 +53,11 @@ class AuthService {
     await Amplify.Auth.signOut();
   }
 
+  /// Delete the currently signed-in user's account.
+  static Future<void> deleteAccount() async {
+    await Amplify.Auth.deleteUser();
+  }
+
   /// Returns true if a valid session exists (user is already logged in).
   static Future<bool> isSignedIn() async {
     final session = await Amplify.Auth.fetchAuthSession();
@@ -104,14 +109,23 @@ class AuthService {
 
   /// Returns a human-readable message from an [AuthException].
   static String friendlyError(AuthException e) {
-    if (e is UserNotFoundException) return 'No account found with this email.';
-    if (e is UserNotConfirmedException) return 'Please verify your email before signing in.';
-    if (e is UsernameExistsException) return 'An account with this email already exists.';
-    if (e is CodeMismatchException) return 'Invalid code. Please check and try again.';
+    if (e is UserNotFoundException) {
+      return 'No account found with this email.';
+    }
+    if (e is UserNotConfirmedException) {
+      return 'Please verify your email before signing in.';
+    }
+    if (e is UsernameExistsException) {
+      return 'An account with this email already exists.';
+    }
+    if (e is CodeMismatchException) {
+      return 'Invalid code. Please check and try again.';
+    }
     // Match remaining types by message content (not all are exported by amplify_auth_cognito)
     final msg = e.message.toLowerCase();
-    if (msg.contains('not authorized') || msg.contains('incorrect username or password')) {
-      return 'Incorrect password. Please try again.';
+    if (msg.contains('not authorized') ||
+        msg.contains('incorrect username or password')) {
+      return 'Email or password looks incorrect. Please try again.';
     }
     if (msg.contains('expired') || msg.contains('code has expired')) {
       return 'Code has expired. Please request a new one.';
@@ -119,7 +133,8 @@ class AuthService {
     if (msg.contains('limit exceeded') || msg.contains('too many')) {
       return 'Too many attempts. Please wait and try again.';
     }
-    if (msg.contains('invalid password') || msg.contains('password did not conform')) {
+    if (msg.contains('invalid password') ||
+        msg.contains('password did not conform')) {
       return 'Password must be at least 8 characters and include a number and special character.';
     }
     return e.message;
